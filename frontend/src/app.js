@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { CONFIG } from './config.js';
 import { api, ApiError } from './api.js';
 import { renderAncestors, renderDescendants } from './lineage-render.js';
+import { initCommunity, openMyProfile, loadCrossingOptions } from './community.js';
 
 const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
@@ -27,6 +28,22 @@ function setError(id, err) {
     : '';
 }
 
+// ---- タブ切り替え -----------------------------------------------------------
+
+const TABS = ['timeline', 'records', 'profile'];
+
+function switchTab(name) {
+  for (const t of TABS) {
+    $(`tab-${t}`).classList.toggle('hidden', t !== name);
+    $(`tabbtn-${t}`).classList.toggle('active', t === name);
+  }
+}
+
+$('tabbtn-timeline').onclick = () => switchTab('timeline');
+$('tabbtn-records').onclick = () => switchTab('records');
+// プロフィールタブは自分のプロフィールを開く（他人のは投稿者名クリックで遷移）
+$('tabbtn-profile').onclick = () => openMyProfile();
+
 // ---- 認証・登録 -----------------------------------------------------------
 
 async function refreshSession() {
@@ -44,6 +61,8 @@ async function refreshSession() {
     show('auth-card', false);
     show('register-card', false);
     show('app-area', true);
+    switchTab('timeline');
+    initCommunity({ token, me: profile, switchTab });
     await Promise.all([loadPlants(), loadCrossings()]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 403) {
@@ -313,7 +332,7 @@ $('btn-create-crossing').onclick = async () => {
     if ($('cross-date').value) body.cross_date = $('cross-date').value;
     if ($('cross-notes').value.trim()) body.notes = $('cross-notes').value;
     await api.createCrossing(token(), body);
-    await loadCrossings();
+    await Promise.all([loadCrossings(), loadCrossingOptions()]);
   } catch (e) {
     setError('crossing-error', e);
   }

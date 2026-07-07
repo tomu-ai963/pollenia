@@ -116,3 +116,70 @@ button.small { padding: 0.2rem 0.6rem; font-size: 0.8rem; margin-top: 0; }
 .photos img { width: 110px; height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 
 pre.debug { font-size: 0.7rem; overflow-x: auto; background: #f0efe8; padding: 0.5rem; border-radius: 6px; }
+
+/* ---- コミュニティ（Phase 2.5） ---- */
+
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.tabs .tab {
+  margin-top: 0;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 1rem;
+}
+.tabs .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.post { border-bottom: 1px solid var(--line); padding: 0.7rem 0; }
+.post:last-child { border-bottom: none; }
+.post-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.post-head .meta { font-size: 0.75rem; color: var(--muted); }
+
+.author-link {
+  background: none;
+  border: none;
+  color: var(--accent-dark);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+.author-link:hover { background: none; text-decoration: underline; }
+
+.post-content { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.3rem 0; }
+
+.crossing-box {
+  background: #f4f7ec;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  margin: 0.3rem 0;
+}
+.crossing-box .meta { font-size: 0.75rem; color: var(--muted); }
+
+.post-foot { display: flex; gap: 0.5rem; margin-top: 0.3rem; }
+button.like.active { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+.comments {
+  margin: 0.5rem 0 0 0.5rem;
+  border-left: 2px solid var(--line);
+  padding-left: 0.8rem;
+}
+.comment { padding: 0.3rem 0; }
+.comment .meta { font-size: 0.75rem; color: var(--muted); }
+.comment-form { display: flex; gap: 0.5rem; align-items: flex-end; margin-top: 0.4rem; }
+.comment-form textarea { min-height: 2.6rem; flex: 1; }
+.comment-form button { margin-top: 0; }
+
+.profile-stats { display: flex; gap: 0.6rem; align-items: center; margin: 0.4rem 0; flex-wrap: wrap; }
+.follow-user {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.follow-user:last-child { border-bottom: none; }
+.follow-user .meta { font-size: 0.75rem; color: var(--muted); }

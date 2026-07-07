@@ -45,6 +45,86 @@
     </section>
 
     <div id="app-area" class="hidden">
+      <nav class="tabs">
+        <button class="tab active" id="tabbtn-timeline">タイムライン</button>
+        <button class="tab" id="tabbtn-records">記録</button>
+        <button class="tab" id="tabbtn-profile">プロフィール</button>
+      </nav>
+
+      <!-- タイムライン（Phase 2.5） -->
+      <div id="tab-timeline">
+        <section class="card">
+          <h2>投稿する</h2>
+          <label>本文（必須・5000文字以内）</label>
+          <textarea id="post-content" maxlength="5000"></textarea>
+          <div class="row">
+            <div>
+              <label>公開範囲</label>
+              <select id="post-visibility">
+                <option value="public" selected>public（全体公開）</option>
+                <option value="followers">followers（フォロワーのみ）</option>
+                <option value="private">private（自分のみ）</option>
+              </select>
+            </div>
+            <div>
+              <label>交配記録を添付（自分の記録のみ）</label>
+              <select id="post-crossing">
+                <option value="">（添付しない）</option>
+              </select>
+            </div>
+          </div>
+          <button id="btn-create-post">投稿</button>
+          <span class="notice" id="post-notice"></span>
+          <div class="error" id="post-error"></div>
+        </section>
+
+        <section class="card">
+          <h2>タイムライン</h2>
+          <p class="notice">フォロー中のユーザーの投稿が新しい順に表示されます。</p>
+          <div id="feed-list"></div>
+          <p class="notice hidden" id="feed-empty">
+            まだ投稿がありません。ユーザーをフォローするとここに表示されます。
+          </p>
+          <button class="ghost hidden" id="btn-feed-more">もっと見る</button>
+          <div class="error" id="feed-error"></div>
+        </section>
+      </div>
+
+      <!-- プロフィール（Phase 2.5） -->
+      <div id="tab-profile" class="hidden">
+        <section class="card">
+          <div class="row">
+            <div>
+              <label>ユーザーIDでプロフィールを開く</label>
+              <input id="profile-open-id" placeholder="ユーザーID（UUID）">
+            </div>
+          </div>
+          <button class="small ghost" id="btn-open-profile">開く</button>
+          <div class="error" id="profile-open-error"></div>
+        </section>
+
+        <section class="card">
+          <h2 id="profile-name"></h2>
+          <p class="notice" id="profile-bio"></p>
+          <div class="profile-stats">
+            <button class="small ghost" id="btn-followers">フォロワー <span id="follower-count">0</span></button>
+            <button class="small ghost" id="btn-following">フォロー中 <span id="following-count">0</span></button>
+            <button class="small hidden" id="btn-follow-toggle"></button>
+          </div>
+          <div id="follow-list" class="hidden"></div>
+          <div class="error" id="profile-error"></div>
+        </section>
+
+        <section class="card">
+          <h2>投稿</h2>
+          <div id="profile-posts"></div>
+          <p class="notice hidden" id="profile-posts-empty">投稿はありません。</p>
+          <button class="ghost hidden" id="btn-profile-more">もっと見る</button>
+        </section>
+      </div>
+
+      <!-- 記録（Phase 1） -->
+      <div id="tab-records" class="hidden">
       <!-- 個体 -->
       <section class="card">
         <h2>個体を登録</h2>
@@ -126,6 +206,7 @@
         <h2>交配記録一覧</h2>
         <div id="crossing-list"></div>
       </section>
+      </div><!-- /tab-records -->
     </div>
   </main>
 

@@ -10,6 +10,8 @@ export class ApiError extends Error {
   }
 }
 
+const enc = encodeURIComponent;
+
 async function call(path, { method = 'GET', token = null, body = undefined } = {}) {
   const headers = {};
   if (token) headers['authorization'] = `Bearer ${token}`;
@@ -55,6 +57,29 @@ export const api = {
   // lineage
   lineage: (token, plantId, direction = 'up', depth = 5) =>
     call(`/api/plants/${plantId}/lineage?direction=${direction}&depth=${depth}`, { token }),
+
+  // community (Phase 2)
+  // パスパラメータは必ず enc() を通す（プロフィール画面のユーザーID欄は自由入力のため、
+  // `/` 等を含む値でリクエスト先パスを改変されないようにする — Opus 4.8 レビュー指摘）
+  feed: (token, { limit = 20, offset = 0 } = {}) =>
+    call(`/api/feed?limit=${limit}&offset=${offset}`, { token }),
+  createPost: (token, post) => call('/api/posts', { method: 'POST', token, body: post }),
+  getPost: (token, id) => call(`/api/posts/${enc(id)}`, { token }),
+  listUserPosts: (token, userId, { limit = 20, offset = 0 } = {}) =>
+    call(`/api/users/${enc(userId)}/posts?limit=${limit}&offset=${offset}`, { token }),
+  likePost: (token, postId) => call(`/api/posts/${enc(postId)}/likes`, { method: 'POST', token }),
+  unlikePost: (token, postId) =>
+    call(`/api/posts/${enc(postId)}/likes`, { method: 'DELETE', token }),
+  listComments: (token, postId) => call(`/api/posts/${enc(postId)}/comments`, { token }),
+  createComment: (token, postId, content) =>
+    call(`/api/posts/${enc(postId)}/comments`, { method: 'POST', token, body: { content } }),
+  follow: (token, followeeId) =>
+    call('/api/follows', { method: 'POST', token, body: { followee_id: followeeId } }),
+  unfollow: (token, followeeId) =>
+    call(`/api/follows/${enc(followeeId)}`, { method: 'DELETE', token }),
+  getUser: (token, userId) => call(`/api/users/${enc(userId)}`, { token }),
+  listFollowers: (token, userId) => call(`/api/users/${enc(userId)}/followers`, { token }),
+  listFollowing: (token, userId) => call(`/api/users/${enc(userId)}/following`, { token }),
 
   // 公開ページ（認証不要）
   publicPlant: (plantId) => call(`/public/plants/${plantId}`),
