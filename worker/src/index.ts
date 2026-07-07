@@ -22,6 +22,23 @@ import {
 } from './routes/records';
 import { handleGetLineage } from './routes/lineage';
 import { handlePublicPlant } from './routes/public';
+import {
+  handleCreateComment,
+  handleCreateLike,
+  handleCreatePost,
+  handleDeleteLike,
+  handleFeed,
+  handleGetPost,
+  handleListComments,
+  handleListUserPosts,
+} from './routes/posts';
+import {
+  handleCreateFollow,
+  handleDeleteFollow,
+  handleGetUserProfile,
+  handleListFollowers,
+  handleListFollowing,
+} from './routes/follows';
 
 // ルーティングのみ（ハンドラ実体は routes/）。Phase 1 のエンドポイント:
 //   認証不要
@@ -36,7 +53,12 @@ import { handlePublicPlant } from './routes/public';
 //     - GET/POST /api/crossings、POST /api/crossings/:id/harvests
 //     - POST /api/harvests/:id/sowings、PATCH /api/sowings/:id
 //     - GET  /api/plants/:id/lineage?direction=up|down&depth=N
-// スコープ外（Phase 2/3）: posts / follows / likes / comments / AI / 課金。
+// Phase 2（コミュニティ。すべて JWT + profiles 行）:
+//     - POST /api/posts、GET /api/posts/:id、GET /api/feed
+//     - POST/DELETE /api/posts/:id/likes、GET/POST /api/posts/:id/comments
+//     - POST /api/follows、DELETE /api/follows/:followee_id
+//     - GET  /api/users/:id、/api/users/:id/posts、/followers、/following
+// スコープ外（Phase 3）: AI / 課金。
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(req.url);
@@ -136,6 +158,75 @@ async function route(req: Request, env: Env, sql: Sql, pathname: string): Promis
   if (sowingById) {
     if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
     return handleUpdateSowing(req, sql, user, decodeURIComponent(sowingById[1]));
+  }
+
+  // --- Phase 2: コミュニティ ------------------------------------------------
+
+  if (pathname === '/api/feed') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleFeed(req, sql, user);
+  }
+
+  if (pathname === '/api/posts') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleCreatePost(req, sql, user);
+  }
+
+  const postLikes = pathname.match(/^\/api\/posts\/([^/]+)\/likes$/);
+  if (postLikes) {
+    const id = decodeURIComponent(postLikes[1]);
+    if (req.method === 'POST') return handleCreateLike(sql, user, id);
+    if (req.method === 'DELETE') return handleDeleteLike(sql, user, id);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  const postComments = pathname.match(/^\/api\/posts\/([^/]+)\/comments$/);
+  if (postComments) {
+    const id = decodeURIComponent(postComments[1]);
+    if (req.method === 'GET') return handleListComments(req, sql, user, id);
+    if (req.method === 'POST') return handleCreateComment(req, sql, user, id);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  const postById = pathname.match(/^\/api\/posts\/([^/]+)$/);
+  if (postById) {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleGetPost(sql, user, decodeURIComponent(postById[1]));
+  }
+
+  if (pathname === '/api/follows') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleCreateFollow(req, sql, user);
+  }
+
+  const followByFollowee = pathname.match(/^\/api\/follows\/([^/]+)$/);
+  if (followByFollowee) {
+    if (req.method !== 'DELETE') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleDeleteFollow(sql, user, decodeURIComponent(followByFollowee[1]));
+  }
+
+  const userPosts = pathname.match(/^\/api\/users\/([^/]+)\/posts$/);
+  if (userPosts) {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleListUserPosts(req, sql, user, decodeURIComponent(userPosts[1]));
+  }
+
+  const userFollowers = pathname.match(/^\/api\/users\/([^/]+)\/followers$/);
+  if (userFollowers) {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleListFollowers(req, sql, decodeURIComponent(userFollowers[1]));
+  }
+
+  const userFollowing = pathname.match(/^\/api\/users\/([^/]+)\/following$/);
+  if (userFollowing) {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleListFollowing(req, sql, decodeURIComponent(userFollowing[1]));
+  }
+
+  const userById = pathname.match(/^\/api\/users\/([^/]+)$/);
+  if (userById) {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleGetUserProfile(sql, user, decodeURIComponent(userById[1]));
   }
 
   return errorResponse('NOT_FOUND');

@@ -31,3 +31,7 @@ export const PHOTO_CONTENT_TYPES: Record<string, string> = {
 // テキスト入力の上限（暴発防止）。
 export const MAX_NAME_LEN = 200;
 export const MAX_TEXT_LEN = 10_000;
+
+// コミュニティ（Phase 2）。★仮決め。
+export const MAX_POST_LEN = 5_000;
+export const MAX_COMMENT_LEN = 2_000;

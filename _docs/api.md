@@ -58,22 +58,37 @@ supabase-js は JWT 検証と Storage 署名URL発行のみ。
   原則「判定は常に対象データ自身の visibility 列 + 所有者。参照元エンティティの公開状態を
   継承しない」。Phase 2 の posts → crossing 展開は必ずこのモジュールを経由すること。
 
-## Phase 2
+## Phase 2（実装済み。すべて JWT + profiles 行を要求）
 
 | Method | Path | 内容 |
 |---|---|---|
-| GET/POST | /api/posts | フィード・投稿（下記の crossing 展開に注意） |
-| POST/DELETE | /api/posts/:id/likes | いいね |
-| GET/POST | /api/posts/:id/comments | コメント |
-| POST/DELETE | /api/users/:id/follow | フォロー |
-| GET | /api/users/:id | 公開プロフィール |
+| POST | /api/posts | 投稿作成 `{ content, crossing_id?, visibility? }`（crossing_id は自分の交配のみ） |
+| GET | /api/posts/:id | 投稿単体（crossing 展開は下記 F6 ルール） |
+| GET | /api/feed | フィード。Worker 側の2段階クエリ（follows → posts の visibility 絞り込み）で集約 |
+| GET | /api/users/:id/posts | プロフィール用。本人=全件 / フォロワー=public+followers / 他人=public のみ |
+| POST/DELETE | /api/posts/:id/likes | いいね・解除（冪等。可視性は親 post に完全追従） |
+| GET/POST | /api/posts/:id/comments | コメント（同上） |
+| POST | /api/follows | フォロー `{ followee_id }`（片方向・冪等） |
+| DELETE | /api/follows/:followee_id | フォロー解除（冪等） |
+| GET | /api/users/:id/followers, /following | フォロワー / フォロー中一覧 |
+| GET | /api/users/:id | 公開プロフィール（フォロー数 + followed_by_viewer 付き） |
 
-- **post に紐付く crossing の展開は post とは別に可視性判定すること。**
+- **F6（実装済み・後退厳禁）: post に紐付く crossing の展開は post とは別に可視性判定する。**
   `posts.visibility` の既定は `public`、`plants` の既定は `private` と非対称なため、
   公開 post が非公開の crossing（＝非公開の親個体）を `crossing_id` で参照しうる。
-  post が閲覧可でも、`crossing_id` の交配詳細・親個体名を展開する際は必ず
-  `can_view(crossing.user_id, ...)` や親 plants の可視性を別途チェックし、
-  不可視なら crossing 情報を伏せて post 本文だけ返す（閲覧者へ非公開系統を漏らさない）。
+  post が閲覧可でも、crossing の展開は `lib/visibility.ts` の
+  `canViewOwnerOnly(viewer, crossing.user_id)`（crossings は visibility 列を持たない＝
+  所有者のみ）を通った場合だけ。不可視なら crossing 情報を **crossing_id ごと** 伏せて
+  post 本文だけ返す（post 自体は隠さない）。実装は `routes/posts.ts` の
+  `serializePosts`、検証は `test/posts.test.ts`。
+- フィード生成を RLS の動的サブクエリに埋め込まない（設計判断3）。RLS は deny-all を
+  維持し、pollenia スキーマは PostgREST 非露出を継続する（0003 のコメント参照）。
+- **フロント実装への注意（Opus 4.8 レビュー指摘）**: post / comment の content は
+  API 層では長さ検証のみで HTML サニタイズしない（JSON で返すだけ）。Phase 2 で初めて
+  他者の入力がタイムラインに描画されるため、フロントは必ずテキストとして描画すること
+  （innerHTML 直挿し禁止。textContent か枠組み側の自動エスケープを使う）。
+- follow / like / comment 作成のレート制限は Worker 実装には無い。スパム対策は
+  Cloudflare 側の WAF / Rate Limiting ルールで担保する（本番運用時に設定）。
 
 ## Phase 3（有料）
 
