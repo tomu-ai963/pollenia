@@ -25,7 +25,7 @@ compatibility_flags = ["nodejs_compat"]
 #   Supavisor session モード（ポート 5432）を第2候補にする。transaction モード(6543)は使わない。
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "REPLACE_WITH_HYPERDRIVE_ID"
+id = "786b6bea7dfe4a94a50079c5f8bd0ba1"  # pollenia-db（origin: Supabase Direct connection 5432）
 # ローカル開発では wrangler dev がこの値を HYPERDRIVE.connectionString として注入する
 # （id は参照されず、Hyperdrive のクエリキャッシュも効かない — 公式ドキュメント）。
 # 値は supabase start のローカル既定で、秘匿情報ではない。
