@@ -8,9 +8,10 @@
 SUPABASE_URL="http://127.0.0.1:54321"
 SUPABASE_SERVICE_ROLE_KEY="<supabase start が表示する service_role key>"
 
-# --- Postgres 直接続 (postgres.js / TCP) ---
-# pollenia スキーマへの全 DB アクセス（テーブル・RPC）はこの接続で行う。
-# ローカル: supabase start が立てる Postgres（既定は下記）。
-# 本番: Supavisor の transaction モード pooler URI（ポート 6543）を wrangler secret put で設定する。
-#   例: postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
-DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+# --- Postgres 接続（フォールバック用・通常は不要）---
+# 通常の接続経路は wrangler.toml の Hyperdrive バインディング:
+#   ローカル: localConnectionString が HYPERDRIVE.connectionString に注入される
+#   本番:     wrangler hyperdrive create で作った設定（接続情報は Cloudflare 側にのみ保存）
+# DATABASE_URL はバインディングなしで動かすときのフォールバック。
+# 通常はコメントアウトのままでよい（lib/db.ts は HYPERDRIVE を優先する）。
+# DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"

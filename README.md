@@ -67,14 +67,19 @@ npm run dev
 フロント直読みを解禁する Phase 2 で、テーブル/ビュー/関数ごとの明示 GRANT 設計とセットで露出する。
 
 このため Worker からの `pollenia` スキーマへの DB アクセス（テーブル・RPC）は
-**postgres.js による TCP 直接続**（`DATABASE_URL`）で行う。supabase-js の DB アクセスは
-PostgREST 経由であり、非露出スキーマは service_role でも呼べない（service_role が
-バイパスするのは RLS であってスキーマ露出ではない）ため使わない。
-supabase-js は Auth の JWT 検証（`auth.getUser`）と Storage の署名URL発行にのみ使う。
+**postgres.js**で行う。supabase-js の DB アクセスは PostgREST 経由であり、
+非露出スキーマは service_role でも呼べない（service_role がバイパスするのは RLS で
+あってスキーマ露出ではない）ため使わない。supabase-js は Auth の JWT 検証
+（`auth.getUser`）と Storage の署名URL発行にのみ使う。
+
+接続経路は **Cloudflare Hyperdrive** バインディング（`worker/wrangler.toml`）:
 
 ```
-DATABASE_URL（ローカル）: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-DATABASE_URL（本番）:     Supavisor transaction pooler（ポート 6543）の URI を wrangler secret put
+ローカル: wrangler dev が localConnectionString（supabase start の 54322）を
+          HYPERDRIVE.connectionString として注入（本番と同一コードパス）
+本番:     wrangler hyperdrive create で作成した設定（接続情報は Cloudflare 側にのみ保存。
+          origin は Supabase の Direct connection 推奨 — wrangler.toml のコメント参照）
+予備:     バインディングが無い環境は DATABASE_URL 直接続にフォールバック（lib/db.ts）
 ```
 
 ## 間借り運用の掟（将来の独立切り出しのため）
