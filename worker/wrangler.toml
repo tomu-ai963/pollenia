@@ -1,0 +1,12 @@
+name = "pollenia-worker"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+# @supabase/supabase-js / postgres (postgres.js) を Workers ランタイムで動かすために必要。
+# postgres.js は cloudflare:sockets 経由の TCP 直接続を使う（PostgREST 非経由。
+# pollenia スキーマを PostgREST に露出しないまま DB アクセスするための構成 — README「掟」6 参照）。
+compatibility_flags = ["nodejs_compat"]
+
+# シークレット (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / DATABASE_URL) は
+# コードにも wrangler.toml にも書かない。ローカルは .dev.vars、本番は `wrangler secret put`。
+# .dev.vars.example を .dev.vars にコピーして値を埋める。

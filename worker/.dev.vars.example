@@ -1,0 +1,16 @@
+# ローカル開発用シークレットのテンプレート。
+# このファイルを `.dev.vars` にコピーして値を埋める（.dev.vars はコミット禁止）。
+# wrangler dev はカレントの .dev.vars を自動で env に注入する。
+
+# --- Supabase (tomu-system プロジェクトに間借り) ---
+# Auth の JWT 検証（auth.getUser）と Storage の署名URL発行にのみ使う。
+# DB アクセスには使わない（pollenia スキーマは PostgREST 非露出のため — README「掟」6）。
+SUPABASE_URL="http://127.0.0.1:54321"
+SUPABASE_SERVICE_ROLE_KEY="<supabase start が表示する service_role key>"
+
+# --- Postgres 直接続 (postgres.js / TCP) ---
+# pollenia スキーマへの全 DB アクセス（テーブル・RPC）はこの接続で行う。
+# ローカル: supabase start が立てる Postgres（既定は下記）。
+# 本番: Supavisor の transaction モード pooler URI（ポート 6543）を wrangler secret put で設定する。
+#   例: postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"

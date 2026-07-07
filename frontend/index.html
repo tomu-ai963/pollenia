@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pollenia — 育種記録</title>
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <header>
+    <h1>🌸 Pollenia</h1>
+    <div>
+      <span class="who" id="who"></span>
+      <button class="small ghost" id="btn-signout" style="color:#fff;border-color:rgba(255,255,255,.5)">ログアウト</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 認証 -->
+    <section class="card" id="auth-card">
+      <h2>ログイン / 新規登録</h2>
+      <div class="row">
+        <div>
+          <label>メールアドレス</label>
+          <input type="email" id="auth-email" autocomplete="email">
+        </div>
+        <div>
+          <label>パスワード</label>
+          <input type="password" id="auth-password" autocomplete="current-password">
+        </div>
+      </div>
+      <button id="btn-signin">ログイン</button>
+      <button class="ghost" id="btn-signup">アカウント作成</button>
+      <div class="error" id="auth-error"></div>
+    </section>
+
+    <!-- Pollenia 初回登録（JWT はあるが profiles 行がない状態） -->
+    <section class="card hidden" id="register-card">
+      <h2>Pollenia へようこそ</h2>
+      <p class="notice">表示名を決めて登録を完了してください。</p>
+      <label>表示名</label>
+      <input id="register-name" maxlength="200">
+      <button id="btn-register">登録する</button>
+      <div class="error" id="register-error"></div>
+    </section>
+
+    <div id="app-area" class="hidden">
+      <!-- 個体 -->
+      <section class="card">
+        <h2>個体を登録</h2>
+        <div class="row">
+          <div>
+            <label>名前（必須）</label>
+            <input id="plant-name" maxlength="200">
+          </div>
+          <div>
+            <label>属・種</label>
+            <input id="plant-species" maxlength="200">
+          </div>
+          <div>
+            <label>公開範囲</label>
+            <select id="plant-visibility">
+              <option value="private" selected>private（自分のみ）</option>
+              <option value="followers">followers</option>
+              <option value="public">public</option>
+            </select>
+          </div>
+        </div>
+        <label>メモ</label>
+        <textarea id="plant-notes"></textarea>
+        <button id="btn-create-plant">登録</button>
+        <div class="error" id="plant-error"></div>
+      </section>
+
+      <section class="card">
+        <h2>個体一覧</h2>
+        <div id="plant-list"></div>
+      </section>
+
+      <!-- 個体詳細 -->
+      <section class="card hidden" id="detail-card">
+        <h2 id="detail-title"></h2>
+        <div class="photos" id="detail-photos"></div>
+        <div class="row">
+          <div>
+            <label>写真を追加</label>
+            <input type="file" id="photo-file" accept="image/jpeg,image/png,image/webp">
+          </div>
+          <div>
+            <label>キャプション</label>
+            <input id="photo-caption">
+          </div>
+        </div>
+        <button id="btn-upload-photo">アップロード</button>
+        <h2 style="margin-top:1rem">系統樹</h2>
+        <button class="small ghost" id="btn-lineage-up">⬆ 祖先（系譜）</button>
+        <button class="small ghost" id="btn-lineage-down">⬇ 子孫（この個体から）</button>
+        <div id="lineage-tree" style="margin-top:0.6rem"></div>
+        <div class="error" id="detail-error"></div>
+      </section>
+
+      <!-- 交配・採種・播種 -->
+      <section class="card">
+        <h2>交配を記録</h2>
+        <div class="row">
+          <div>
+            <label>母木（種子親・必須）</label>
+            <select id="cross-seed"></select>
+          </div>
+          <div>
+            <label>花粉親</label>
+            <select id="cross-pollen"></select>
+          </div>
+          <div>
+            <label>交配日</label>
+            <input type="date" id="cross-date">
+          </div>
+        </div>
+        <label>メモ</label>
+        <textarea id="cross-notes"></textarea>
+        <button id="btn-create-crossing">記録する</button>
+        <div class="error" id="crossing-error"></div>
+      </section>
+
+      <section class="card">
+        <h2>交配記録一覧</h2>
+        <div id="crossing-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

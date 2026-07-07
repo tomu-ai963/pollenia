@@ -1,0 +1,23 @@
+{
+  "name": "pollenia-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pollenia API (Cloudflare Workers) — 植物の交配・育種記録と系統樹の Phase 1 実装",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "@types/node": "^20.19.43",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.9",
+    "wrangler": "^3.78.10"
+  }
+}

@@ -1,0 +1,40 @@
+# === dependencies ===
+node_modules/
+**/node_modules/
+
+# === secrets / env（絶対にコミットしない）===
+.dev.vars
+**/.dev.vars
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+
+# === Cloudflare Workers / wrangler ===
+.wrangler/
+**/.wrangler/
+dist/
+**/dist/
+.mf/
+
+# === Supabase ローカル（Docker/CLI 一時ファイル）===
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/logs/
+
+# === Claude Code ローカル設定 ===
+.claude/
+
+# === logs / debug ===
+*.log
+npm-debug.log*
+
+# === OS / editor ===
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
