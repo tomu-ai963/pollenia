@@ -19,3 +19,11 @@ export function createDb(env: Env): Sql {
     fetch_types: false,
   });
 }
+
+// fetch_types を切っているため postgres.js は JS 配列を Postgres の配列リテラルに
+// 自動シリアライズできない（素通しすると "a,b" という不正なリテラルになる）。
+// uuid 配列は必ずこのヘルパーで `{a,b}` 形式にして `::uuid[]` キャスト付きで渡すこと。
+// 要素は isUuid 検証済み、または DB から取得した uuid に限る（自由文字列を渡さない）。
+export function uuidArrayLiteral(ids: string[]): string {
+  return `{${ids.join(',')}}`;
+}

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Sql } from '../lib/db';
+import { uuidArrayLiteral, type Sql } from '../lib/db';
 import { PHOTO_BUCKET, PHOTO_SIGNED_URL_SECONDS } from '../constants';
 
 // 系統樹の取得と組み立て。
@@ -78,12 +78,12 @@ export async function buildLineageNodes(
   const plants = await sql`
     select id, name, species, deleted_at
     from pollenia.plants
-    where id = any(${visibleIds}::uuid[])
+    where id = any(${uuidArrayLiteral(visibleIds)}::uuid[])
   `;
   const photos = await sql`
     select distinct on (plant_id) plant_id, storage_path
     from pollenia.plant_photos
-    where plant_id = any(${visibleIds}::uuid[])
+    where plant_id = any(${uuidArrayLiteral(visibleIds)}::uuid[])
     order by plant_id, created_at desc
   `;
 

@@ -1,4 +1,4 @@
-import type { Sql } from '../lib/db';
+import { uuidArrayLiteral, type Sql } from '../lib/db';
 import { json } from '../lib/http';
 import { errorResponse } from '../lib/error-response';
 import type { AuthedUser } from '../lib/auth';
@@ -32,7 +32,7 @@ export async function handleListCrossings(
   const harvests = await sql`
     select id, crossing_id, harvest_date, seed_count, notes, created_at, updated_at
     from pollenia.seed_harvests
-    where crossing_id = any(${crossingIds}::uuid[]) and user_id = ${user.uid}::uuid
+    where crossing_id = any(${uuidArrayLiteral(crossingIds)}::uuid[]) and user_id = ${user.uid}::uuid
     order by created_at
   `;
   const harvestIds = harvests.map((h) => h.id);
@@ -41,7 +41,7 @@ export async function handleListCrossings(
         select id, seed_harvest_id, sowing_date, sowing_count, germination_count,
                first_germination_date, notes, created_at, updated_at
         from pollenia.sowings
-        where seed_harvest_id = any(${harvestIds}::uuid[]) and user_id = ${user.uid}::uuid
+        where seed_harvest_id = any(${uuidArrayLiteral(harvestIds)}::uuid[]) and user_id = ${user.uid}::uuid
         order by created_at
       `
     : [];
@@ -55,7 +55,7 @@ export async function handleListCrossings(
   const parents = parentIds.length
     ? await sql`
         select id, name from pollenia.plants
-        where id = any(${parentIds}::uuid[]) and user_id = ${user.uid}::uuid
+        where id = any(${uuidArrayLiteral(parentIds)}::uuid[]) and user_id = ${user.uid}::uuid
       `
     : [];
   const nameById = new Map(parents.map((p) => [p.id, p.name]));
@@ -116,7 +116,7 @@ export async function handleCreateCrossing(
   const checkIds = pollenParentId ? [seedParentId, pollenParentId] : [seedParentId];
   const owned = await sql`
     select id from pollenia.plants
-    where id = any(${checkIds}::uuid[]) and user_id = ${user.uid}::uuid and deleted_at is null
+    where id = any(${uuidArrayLiteral(checkIds)}::uuid[]) and user_id = ${user.uid}::uuid and deleted_at is null
   `;
   const ownedIds = new Set(owned.map((r) => r.id));
   if (!ownedIds.has(seedParentId) || (pollenParentId && !ownedIds.has(pollenParentId))) {
