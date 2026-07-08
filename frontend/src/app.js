@@ -186,6 +186,34 @@ async function loadPlants() {
   }
 }
 
+// 記録タブの構造化フィールド → traits オブジェクト。空欄はキーごと含めない。
+// 未知キーが将来増えても壊れないよう、ここは既知キーだけを素直に組み立てる。
+function collectPlantTraits() {
+  const traits = {};
+  const bloom = $('plant-bloom-season').value;
+  if (bloom) traits.bloom_season = bloom;
+  const strength = $('plant-fragrance-strength').value;
+  if (strength !== '') traits.fragrance_strength = Number(strength);
+  const fragType = $('plant-fragrance-type').value.trim();
+  if (fragType) traits.fragrance_type = fragType;
+  const height = $('plant-height-cm').value;
+  if (height !== '') traits.plant_height_cm = Number(height);
+  const flower = $('plant-flower-size-cm').value;
+  if (flower !== '') traits.flower_size_cm = Number(flower);
+  return traits;
+}
+
+function resetPlantForm() {
+  $('plant-name').value = '';
+  $('plant-species').value = '';
+  $('plant-notes').value = '';
+  $('plant-bloom-season').value = '';
+  $('plant-fragrance-strength').value = '';
+  $('plant-fragrance-type').value = '';
+  $('plant-height-cm').value = '';
+  $('plant-flower-size-cm').value = '';
+}
+
 $('btn-create-plant').onclick = async () => {
   setError('plant-error', null);
   try {
@@ -195,8 +223,10 @@ $('btn-create-plant').onclick = async () => {
     };
     if ($('plant-species').value.trim()) body.species = $('plant-species').value;
     if ($('plant-notes').value.trim()) body.notes = $('plant-notes').value;
+    const traits = collectPlantTraits();
+    if (Object.keys(traits).length) body.traits = traits;
     await api.createPlant(token(), body);
-    $('plant-name').value = '';
+    resetPlantForm();
     await loadPlants();
   } catch (e) {
     setError('plant-error', e);

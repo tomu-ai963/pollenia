@@ -148,6 +148,51 @@
         </div>
         <label>メモ</label>
         <textarea id="plant-notes"></textarea>
+
+        <!-- 特性（任意・Phase 3 育種相談AIが参照する構造化フィールド）。すべて空欄でよい。 -->
+        <details class="traits">
+          <summary>特性（任意）</summary>
+          <div class="row">
+            <div>
+              <label>開花時期</label>
+              <select id="plant-bloom-season">
+                <option value="" selected>未選択</option>
+                <option value="spring">春</option>
+                <option value="early_summer">初夏</option>
+                <option value="summer">夏</option>
+                <option value="autumn">秋</option>
+                <option value="winter">冬</option>
+              </select>
+            </div>
+            <div>
+              <label>香りの強さ（0〜5）</label>
+              <select id="plant-fragrance-strength">
+                <option value="" selected>未選択</option>
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <div>
+              <label>香りの系統</label>
+              <input id="plant-fragrance-type" maxlength="200" placeholder="例: 柑橘系、バニラ系">
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>草丈（cm）</label>
+              <input id="plant-height-cm" type="number" min="0" step="0.1" inputmode="decimal">
+            </div>
+            <div>
+              <label>花のサイズ（cm）</label>
+              <input id="plant-flower-size-cm" type="number" min="0" step="0.1" inputmode="decimal">
+            </div>
+          </div>
+        </details>
+
         <button id="btn-create-plant">登録</button>
         <div class="error" id="plant-error"></div>
       </section>

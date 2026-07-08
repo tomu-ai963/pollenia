@@ -22,7 +22,7 @@ export async function handlePublicPlant(
   if (!isUuid(plantId)) return errorResponse('NOT_FOUND');
 
   const rows = await sql`
-    select p.id, p.user_id, p.name, p.species, p.visibility, p.created_at,
+    select p.id, p.user_id, p.name, p.species, p.visibility, p.traits, p.created_at,
            pr.display_name as owner_name
     from pollenia.plants p
     join pollenia.profiles pr on pr.id = p.user_id
@@ -48,6 +48,7 @@ export async function handlePublicPlant(
         id: plant.id,
         name: plant.name,
         species: plant.species,
+        traits: plant.traits,
         owner_name: plant.owner_name,
         created_at: plant.created_at,
       },

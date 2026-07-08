@@ -5,6 +5,7 @@ import { errorResponse } from '../lib/error-response';
 import type { AuthedUser } from '../lib/auth';
 import { canViewWithDb, type Visibility } from '../lib/visibility';
 import { asDateStr, asText, asVisibility, clampIntParam, isUuid } from '../lib/validate';
+import { parsePlantTraits } from '../lib/traits';
 import {
   LIST_LIMIT_DEFAULT,
   LIST_LIMIT_MAX,
@@ -18,7 +19,7 @@ import {
 // 個体（plants）の CRUD。書き込みは常に所有者のみ。
 // 閲覧は所有者 + canViewWithDb（visibility 列に基づく共通判定。lib/visibility.ts）。
 
-const PLANT_COLS = `id, user_id, name, species, visibility, notes,
+const PLANT_COLS = `id, user_id, name, species, visibility, notes, traits,
   origin_sowing_id, deleted_at, created_at, updated_at`;
 
 // GET /api/plants — 自分の個体一覧（soft delete 済みは除く）。?limit&offset
@@ -61,7 +62,7 @@ export async function handleCreatePlant(
 
   const parsed = parseOptionalPlantFields(body);
   if (!parsed.ok) return parsed.response;
-  const { species, visibility, notes, originSowingId } = parsed.value;
+  const { species, visibility, notes, traits, originSowingId } = parsed.value;
 
   if (originSowingId) {
     const own = await sql`
@@ -76,9 +77,10 @@ export async function handleCreatePlant(
   }
 
   const rows = await sql`
-    insert into pollenia.plants (user_id, name, species, visibility, notes, origin_sowing_id)
+    insert into pollenia.plants (user_id, name, species, visibility, notes, traits, origin_sowing_id)
     values (${user.uid}::uuid, ${name}, ${species}, ${visibility ?? 'private'},
-            ${notes}, ${originSowingId ? sql`${originSowingId}::uuid` : null})
+            ${notes}, ${JSON.stringify(traits ?? {})}::jsonb,
+            ${originSowingId ? sql`${originSowingId}::uuid` : null})
     returning ${sql.unsafe(PLANT_COLS)}
   `;
   return json({ plant: rows[0] }, 201);
@@ -115,7 +117,9 @@ export async function handleGetPlant(
   const photos = await listPhotosWithUrls(sql, supabase, plantId);
 
   if (isOwner) return json({ plant, photos });
-  // 他人向けサブセット（notes・origin_sowing_id 等の記録詳細は所有者のみ）
+  // 他人向けサブセット（notes・origin_sowing_id 等の記録詳細は所有者のみ）。
+  // traits は個体の特性（開花期・香り・サイズ等）で、可視性は plants の visibility に従う
+  // 方針のため、canViewWithDb を通過した閲覧者には含める（name/species と同じ扱い）。
   return json({
     plant: {
       id: plant.id,
@@ -123,6 +127,7 @@ export async function handleGetPlant(
       name: plant.name,
       species: plant.species,
       visibility: plant.visibility,
+      traits: plant.traits,
       created_at: plant.created_at,
     },
     photos,
@@ -152,6 +157,11 @@ export async function handleUpdatePlant(
   if (body.species !== undefined) patch.species = parsed.value.species;
   if (body.visibility !== undefined) patch.visibility = parsed.value.visibility;
   if (body.notes !== undefined) patch.notes = parsed.value.notes;
+  if (body.traits !== undefined) {
+    // JSON 文字列を型未指定パラメータとして渡し、jsonb 列側で推論させる（prepare:false 前提。
+    // insert 側の ${...}::jsonb と同じ格納で、traits を丸ごと置換する）。
+    patch.traits = JSON.stringify(parsed.value.traits ?? {});
+  }
   if (body.origin_sowing_id !== undefined) {
     const originSowingId = parsed.value.originSowingId;
     if (originSowingId) {
@@ -280,6 +290,7 @@ function parseOptionalPlantFields(body: Record<string, unknown>):
         species: string | null;
         visibility: Visibility | null;
         notes: string | null;
+        traits: Record<string, unknown> | null;
         originSowingId: string | null;
       };
     }
@@ -313,6 +324,20 @@ function parseOptionalPlantFields(body: Record<string, unknown>):
     }
   }
 
+  // traits: 未指定なら null（呼び出し側で「触らない / 既定 {}」に振り分ける）。
+  // 指定時は既知キーのみに正規化し、空欄キーは落とす（lib/traits.ts）。
+  let traits: Record<string, unknown> | null = null;
+  if (body.traits !== undefined) {
+    const parsed = parsePlantTraits(body.traits);
+    if (!parsed.ok) {
+      return {
+        ok: false,
+        response: errorResponse('VALIDATION_ERROR', { publicMessage: parsed.message }),
+      };
+    }
+    traits = parsed.value;
+  }
+
   let originSowingId: string | null = null;
   if (body.origin_sowing_id !== undefined && body.origin_sowing_id !== null) {
     if (!isUuid(body.origin_sowing_id)) {
@@ -324,5 +349,5 @@ function parseOptionalPlantFields(body: Record<string, unknown>):
     originSowingId = body.origin_sowing_id;
   }
 
-  return { ok: true, value: { species, visibility, notes, originSowingId } };
+  return { ok: true, value: { species, visibility, notes, traits, originSowingId } };
 }

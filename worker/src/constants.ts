@@ -32,6 +32,17 @@ export const PHOTO_CONTENT_TYPES: Record<string, string> = {
 export const MAX_NAME_LEN = 200;
 export const MAX_TEXT_LEN = 10_000;
 
+// plants.traits（構造化特性・Phase 3 前段）。全項目任意入力。
+// 項目追加はこの定数＋lib/traits.ts＋フロントの更新で完結し、DB マイグレーションは不要。
+export const BLOOM_SEASONS = ['spring', 'early_summer', 'summer', 'autumn', 'winter'] as const;
+export type BloomSeason = (typeof BLOOM_SEASONS)[number];
+
+// 数値項目の上限（暴発防止）。下限は 0 より大（0/負値は未入力扱いにさせない）。
+export const TRAIT_MAX_HEIGHT_CM = 10_000; // 100m。園芸個体としては十分な余裕
+export const TRAIT_MAX_FLOWER_CM = 1_000;
+// 香りの強さは 0〜5 の整数。
+export const TRAIT_FRAGRANCE_STRENGTH_MAX = 5;
+
 // コミュニティ（Phase 2）。★仮決め。
 export const MAX_POST_LEN = 5_000;
 export const MAX_COMMENT_LEN = 2_000;

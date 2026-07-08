@@ -70,6 +70,15 @@ button.small { padding: 0.2rem 0.6rem; font-size: 0.8rem; margin-top: 0; }
 .row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
 .row > div { flex: 1; min-width: 180px; }
 
+details.traits { margin-top: 0.6rem; }
+details.traits > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.5rem;
+  user-select: none;
+}
+
 .plant-item {
   display: flex;
   justify-content: space-between;
