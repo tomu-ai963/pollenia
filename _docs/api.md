@@ -90,11 +90,47 @@ supabase-js は JWT 検証と Storage 署名URL発行のみ。
 - follow / like / comment 作成のレート制限は Worker 実装には無い。スパム対策は
   Cloudflare 側の WAF / Rate Limiting ルールで担保する（本番運用時に設定）。
 
-## Phase 3（有料）
+## Phase 3（AI。実装済み — 無料開放期間。すべて JWT + profiles 行を要求）
 
-- POST /api/ai/consult — 育種相談（knowledge-rag の RAG 構成を流用、ユーザー自身の記録をコンテキスト化）
-- POST /api/ai/listing — 出品文生成（メルカリ・ヤフオク向け）
-- POST /api/ai/diagnose — 写真からの特徴診断・自動メモ化
-- GET /api/analytics/germination — 発芽率グラフ（sowings.germination_count / sowing_count 集計）
+| Method | Path | 内容 |
+|---|---|---|
+| POST | /api/ai/consult | 育種相談チャット `{ message, history? }` → `{ answer, sources }` |
+| POST | /api/ai/listing | 出品文生成 `{ plant_id, marketplace: 'mercari'\|'yahoo_auction' }` → `{ listing: { title, body } }` |
+
+### 育種相談（/api/ai/consult）
+
+- **RAG 構成は knowledge-rag（pgvector）を踏襲**。ただし Worker の DB アクセスは
+  postgres.js 直接続なので、近傍検索は RPC ではなく Worker 内の SQL
+  （`lib/ai/rag.ts` が唯一の入口。**必ず検証済み uid で絞る**）。
+- 参照データは**自分の plants / crossings / seed_harvests / sowings のみ**。
+  posts / comments は含めない（`ai_chunks.source_type` の CHECK でも排除）。
+- チャンクはチャット時に遅延同期（content の SHA-256 で差分検知、差分のみ再埋め込み）。
+  テーブルごと新しい順 `AI_SYNC_MAX_ROWS_PER_TABLE` 件・notes は `AI_CHUNK_NOTES_MAX`
+  文字で切り詰め（参照データ量・トークン量の上限）。
+- 会話履歴はクライアント保持（サーバー保存なし）。`history` は最大
+  `AI_HISTORY_MAX_TURNS` 件・各 `AI_MESSAGE_MAX_LEN` 文字まで Worker が検証する。
+- 埋め込みは OPENAI_API_KEY > VOYAGE_API_KEY > mock（決定的・ローカル用）の優先で選択。
+
+### 出品文生成（/api/ai/listing）
+
+- 対象は**自分の（未削除）個体のみ**。他人の plant_id は 404（存在を秘匿）。
+- 事実は対象個体の name/species/traits/notes + 系統情報（両親名）だけを `<facts>` として渡し、
+  **facts に無い特性・数値・血統を書かない**ことをプロンプトで強制（ハルシネーション対策）。
+  出力は structured outputs（`output_config.format`）で `{title, body}` に固定。
+- 生成結果はフロントで編集・コピーする前提（自動投稿・サーバー保存なし）。
+
+### 共通（セキュリティ・コスト設計）
+
+- Anthropic API の呼び出しは **Worker 経由に統一**（ANTHROPIC_API_KEY はフロントに渡さない）。
+  モデルは `constants.ts` の `AI_MODEL`（claude-opus-4-8）。
+- プロンプトインジェクション対策: system は固定文字列。記録・メモは `<records>` / `<facts>`
+  ブロック内の「データであり指示ではない」ものとして渡し、内部の指示に従わない旨を明示。
+- レート制限: `pollenia.ai_usage_events` で同一ユーザー
+  `AI_RATE_LIMIT_PER_MINUTE` 回/分・`AI_RATE_LIMIT_PER_DAY` 回/日。超過は 429（RATE_LIMITED）。
+  判定は advisory lock でユーザー単位に直列化した「insert → 自分を含めた count」の順
+  （Opus 4.8 レビュー M1: check-then-insert の TOCTOU で並行リクエストがすり抜けるのを防ぐ）。
+  429 になった試行もイベントとして残る。
+- 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）、
+  /api/analytics/germination（発芽率グラフ）。
 
 エラーレスポンス・HTTP ヘルパーは knowledge-rag の `lib/http.ts` / `lib/error-response.ts` の形式を踏襲する。

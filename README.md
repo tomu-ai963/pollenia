@@ -37,8 +37,10 @@ pollenia/
 │   │   ├── env.ts       # 環境変数の型と検証
 │   │   ├── constants.ts
 │   │   ├── lib/         # supabase.ts / auth.ts / http.ts / error-response.ts
-│   │   ├── routes/      # plants.ts / records.ts / lineage.ts / posts.ts / social.ts
-│   │   └── services/    # lineage.ts、将来 ai/（knowledge-rag の RAG 構成を流用）
+│   │   │   └── ai/      # Phase 3: embeddings / context / rag / anthropic / rate-limit
+│   │   │                #   （knowledge-rag の RAG 構成を流用。詳細は _docs/api.md）
+│   │   ├── routes/      # plants.ts / records.ts / lineage.ts / posts.ts / social.ts / ai.ts
+│   │   └── services/    # lineage.ts
 │   └── test/
 └── frontend/            # Cloudflare Pages（他プロジェクトと同じ静的構成）
     ├── index.html
@@ -53,10 +55,13 @@ pollenia/
 #    pollenia のマイグレーションは psql で直接適用し、このリポジトリで履歴管理する
 psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0001_init.sql
 psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0002_rls.sql
+psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0003_community.sql
+psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0004_plant_traits.sql
+psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0005_ai.sql   # pgvector を有効化する（AI機能）
 
 # Worker
 cd worker && npm install
-cp .dev.vars.example .dev.vars   # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / DATABASE_URL を埋める
+cp .dev.vars.example .dev.vars   # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / ANTHROPIC_API_KEY を埋める
 npm run dev
 
 # Storage: private バケット `pollenia-photos` を作成しておく（写真アップロードに必要）
@@ -113,4 +118,5 @@ npm run dev
 
 - **Phase 1（MVP）**: 認証、個体・交配・採種・播種の記録、写真、系統樹表示、公開系統ページ（シェアURL）
 - **Phase 2**: コミュニティ（投稿・フォロー・いいね・コメント）、followers 可視性、フィード
-- **Phase 3**: 課金基盤、AI機能（育種相談・出品文生成・特徴診断）、傾向分析、全世代系統樹の制限解除
+- **Phase 3（AI 実装済み）**: 育種相談AI（自分の記録のみを RAG 参照）・出品文生成（メルカリ/ヤフオク）。
+  無料開放期間として全ユーザーに開放。残り: 課金基盤（Stripe）、写真からの特徴診断、傾向分析、全世代系統樹の制限解除

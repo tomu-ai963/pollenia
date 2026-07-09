@@ -81,6 +81,12 @@ export const api = {
   listFollowers: (token, userId) => call(`/api/users/${enc(userId)}/followers`, { token }),
   listFollowing: (token, userId) => call(`/api/users/${enc(userId)}/following`, { token }),
 
+  // AI (Phase 3)
+  aiConsult: (token, message, history = []) =>
+    call('/api/ai/consult', { method: 'POST', token, body: { message, history } }),
+  aiListing: (token, plantId, marketplace) =>
+    call('/api/ai/listing', { method: 'POST', token, body: { plant_id: plantId, marketplace } }),
+
   // 公開ページ（認証不要）
   publicPlant: (plantId) => call(`/public/plants/${plantId}`),
 };

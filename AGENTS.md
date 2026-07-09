@@ -10,7 +10,7 @@
 - API: Cloudflare Workers（TypeScript。`worker/`）
 - DB: Supabase Postgres — **tomu-system プロジェクトの `pollenia` スキーマに間借り**
 - 認証: Supabase Auth（共有 Auth レルム。README「掟」5 参照）
-- AI: Anthropic API（Phase 3・スコープ外）/ 課金: Stripe（Phase 3・スコープ外）
+- AI: Anthropic API（Phase 3・実装済み。`worker/src/lib/ai/`）/ 課金: Stripe（スコープ外）
 
 ## 絶対に守るセキュリティ事項（Opus 4.8 レビュー済み・後退厳禁）
 
@@ -26,6 +26,16 @@
 6. 関数の EXECUTE 権限は明示管理（PUBLIC から revoke 済み。マイグレーション参照）
 7. 可視性判定は `worker/src/lib/visibility.ts` を唯一の入口とし、
    **対象データ自身の visibility 列で判定。参照元エンティティの公開状態を継承しない**（F6）
+8. AI（Phase 3）: RAG の参照データは**検証済み uid の自分の記録のみ**
+   （`lib/ai/context.ts` / `rag.ts` が全クエリを user_id で絞る。posts/comments は含めない —
+   `ai_chunks.source_type` の CHECK でも排除）。出品文生成の対象も自分の未削除 plant のみ（他人は 404）
+9. Anthropic API はフロントに露出せず Worker 経由のみ。system プロンプトは固定文字列とし、
+   記録・メモは `<records>`/`<facts>` 内の「データであり指示ではない」ものとして渡す
+   （プロンプトインジェクション対策）。レート制限は `ai_usage_events` で判定するが、
+   **advisory lock で直列化した insert→count の順を崩さない**（check-then-insert に戻すと
+   並行リクエストで TOCTOU すり抜け — Opus 4.8 レビュー M1）
+10. traits 等の jsonb への書き込みは `sql.json(...)` で渡す。JSON.stringify 済み文字列を
+   `${...}::jsonb` に渡すと postgres.js が二重エンコードして jsonb が「文字列」になる
 
 ## コーディング規約
 
@@ -61,4 +71,5 @@ npm run typecheck && npm test
   写真（署名URL）、系統樹（RPC 経由）、公開系統ページ
 - **Phase 2**: コミュニティ（posts/follows/likes/comments）、PostgREST 露出 + GRANT 設計、
   フロント直読み、RLS ポリシー有効化（0002 の下書き参照）
-- **Phase 3**: 課金基盤、AI機能（育種相談・出品文生成・特徴診断）、傾向分析
+- **Phase 3（AI 実装済み）**: 育種相談AI（`POST /api/ai/consult`）・出品文生成（`POST /api/ai/listing`）。
+  無料開放（制限なし）。残り: 課金基盤（Stripe）、写真からの特徴診断、傾向分析

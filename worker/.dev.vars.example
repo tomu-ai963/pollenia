@@ -15,3 +15,13 @@ SUPABASE_SERVICE_ROLE_KEY="<supabase start が表示する service_role key>"
 # DATABASE_URL はバインディングなしで動かすときのフォールバック。
 # 通常はコメントアウトのままでよい（lib/db.ts は HYPERDRIVE を優先する）。
 # DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+
+# --- AI（Phase 3: 育種相談・出品文生成）---
+# Anthropic API キー。未設定だと /api/ai/* は 500 になる（他機能には影響しない）。
+# 本番は wrangler secret put ANTHROPIC_API_KEY。
+ANTHROPIC_API_KEY="<Anthropic API key>"
+
+# 埋め込みプロバイダー（任意）。どちらも無ければ決定的な mock 埋め込みで動く
+# （ローカル動作確認用。検索精度は落ちるが配線確認には十分）。
+# OPENAI_API_KEY="<OpenAI API key (text-embedding-3-small)>"
+# VOYAGE_API_KEY="<Voyage API key (voyage-3.5)>"

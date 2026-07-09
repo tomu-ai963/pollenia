@@ -79,7 +79,7 @@ export async function handleCreatePlant(
   const rows = await sql`
     insert into pollenia.plants (user_id, name, species, visibility, notes, traits, origin_sowing_id)
     values (${user.uid}::uuid, ${name}, ${species}, ${visibility ?? 'private'},
-            ${notes}, ${JSON.stringify(traits ?? {})}::jsonb,
+            ${notes}, ${sql.json((traits ?? {}) as Record<string, string | number>)},
             ${originSowingId ? sql`${originSowingId}::uuid` : null})
     returning ${sql.unsafe(PLANT_COLS)}
   `;
@@ -158,9 +158,11 @@ export async function handleUpdatePlant(
   if (body.visibility !== undefined) patch.visibility = parsed.value.visibility;
   if (body.notes !== undefined) patch.notes = parsed.value.notes;
   if (body.traits !== undefined) {
-    // JSON 文字列を型未指定パラメータとして渡し、jsonb 列側で推論させる（prepare:false 前提。
-    // insert 側の ${...}::jsonb と同じ格納で、traits を丸ごと置換する）。
-    patch.traits = JSON.stringify(parsed.value.traits ?? {});
+    // sql.json で渡す（traits を丸ごと置換）。JSON.stringify 済み文字列を ${...}::jsonb に
+    // 渡すと postgres.js が再度 JSON エンコードして jsonb が「文字列」になり、
+    // 0004 の CHECK（jsonb_typeof='object'）に違反する（ローカル検証で確認）。
+    // 値は parsePlantTraits で string|number のみに正規化済み（JSONValue へのキャストは安全）。
+    patch.traits = sql.json((parsed.value.traits ?? {}) as Record<string, string | number>);
   }
   if (body.origin_sowing_id !== undefined) {
     const originSowingId = parsed.value.originSowingId;

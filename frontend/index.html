@@ -48,8 +48,27 @@
       <nav class="tabs">
         <button class="tab active" id="tabbtn-timeline">タイムライン</button>
         <button class="tab" id="tabbtn-records">記録</button>
+        <button class="tab" id="tabbtn-ai">AI相談</button>
         <button class="tab" id="tabbtn-profile">プロフィール</button>
       </nav>
+
+      <!-- AI相談（Phase 3） -->
+      <div id="tab-ai" class="hidden">
+        <section class="card">
+          <h2>育種相談AI</h2>
+          <p class="notice">
+            あなた自身の育種記録（個体・交配・採種・播種）を参照して回答します。
+            会話はこの画面にだけ保持され、サーバーには保存されません。
+          </p>
+          <div class="ai-chat-log" id="ai-chat-log"></div>
+          <label>質問（2000文字以内）</label>
+          <textarea id="ai-message" maxlength="2000"
+            placeholder="例: 香りの強い個体同士を交配したい。どの組み合わせがよさそう？"></textarea>
+          <button id="btn-ai-send">送信</button>
+          <button class="ghost" id="btn-ai-clear">会話をクリア</button>
+          <div class="error" id="ai-error"></div>
+        </section>
+      </div>
 
       <!-- タイムライン（Phase 2.5） -->
       <div id="tab-timeline">
@@ -221,6 +240,31 @@
         <button class="small ghost" id="btn-lineage-up">⬆ 祖先（系譜）</button>
         <button class="small ghost" id="btn-lineage-down">⬇ 子孫（この個体から）</button>
         <div id="lineage-tree" style="margin-top:0.6rem"></div>
+
+        <!-- 出品文自動生成（Phase 3）。生成結果は編集・コピー可能。自動投稿はしない。 -->
+        <h2 style="margin-top:1rem">出品文を生成（AI）</h2>
+        <p class="notice">この個体の特性・系統情報から出品文の下書きを作ります。内容を確認・編集してからご利用ください。</p>
+        <div class="row">
+          <div>
+            <label>出品先</label>
+            <select id="listing-marketplace">
+              <option value="mercari" selected>メルカリ</option>
+              <option value="yahoo_auction">ヤフオク</option>
+            </select>
+          </div>
+        </div>
+        <button id="btn-generate-listing">出品文を生成</button>
+        <div id="listing-result" class="hidden">
+          <label>商品名（編集できます）</label>
+          <input id="listing-title" maxlength="200">
+          <label>本文（編集できます）</label>
+          <textarea id="listing-body" rows="10"></textarea>
+          <button class="small ghost" id="btn-copy-listing-title">商品名をコピー</button>
+          <button class="small ghost" id="btn-copy-listing-body">本文をコピー</button>
+          <span class="notice" id="listing-copied"></span>
+        </div>
+        <div class="error" id="listing-error"></div>
+
         <div class="error" id="detail-error"></div>
       </section>
 

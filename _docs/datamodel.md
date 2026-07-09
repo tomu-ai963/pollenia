@@ -1,6 +1,7 @@
 # Pollenia データモデル
 
-マイグレーション: `supabase/migrations/0001_init.sql`（実体）、`0002_rls.sql`（RLS）
+マイグレーション: `supabase/migrations/0001_init.sql`（実体）、`0002_rls.sql`（RLS）、
+`0003_community.sql`、`0004_plant_traits.sql`、`0005_ai.sql`（AI: pgvector + ai_chunks + ai_usage_events）
 
 ## テーブル一覧
 
@@ -46,6 +47,18 @@ profiles ──┬─ plants ──────────┐
   他人に見せる系統は RPC が plants.visibility で刈り込んで返す。
   理由: 片親 private・片親 public の交配を行単位ポリシーで正しく表現できないため、
   「見せる単位は個体（plant）」に寄せる。
+
+## AI（Phase 3・0005_ai.sql）
+
+- `ai_chunks` … RAG 検索対象。ユーザー自身の plants / crossings / seed_harvests / sowings を
+  正規化テキスト + 埋め込み（`vector(1536)`）で保持。`(user_id, source_type, source_id)` 一意。
+  `source_type` は CHECK で 4 種に限定（posts / comments を参照範囲に含めない方針を物理的に担保）。
+  同期はチャット時の遅延同期（`content_hash` = SHA-256 で差分検知）。
+  ベクトルインデックスは張らない（検索は必ず user_id で絞った後の少量データの seq scan で十分。
+  スケール時に ivfflat 等を検討）。
+- `ai_usage_events` … AI 呼び出しの利用ログ（kind: consult / listing）。レート制限
+  （回/分・回/日）の count 元 + コスト把握。
+- どちらも RLS 有効・ポリシー無し（deny-all）を維持。PostgREST 非露出・Worker 経由のみ。
 
 ## 将来の拡張候補（今はやらない）
 

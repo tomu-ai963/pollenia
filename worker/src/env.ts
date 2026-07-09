@@ -15,4 +15,12 @@ export interface Env {
   //      （単体テスト・Hyperdrive 設定が未作成の環境向け。.dev.vars で設定）。
   HYPERDRIVE?: Hyperdrive;
   DATABASE_URL?: string;
+  // --- Phase 3: AI（育種相談・出品文生成） ---
+  // Anthropic API の呼び出しは必ず Worker 経由（フロントにキーを渡さない）。
+  // 未設定の環境では /api/ai/* が 500（詳細はログのみ）になる。
+  ANTHROPIC_API_KEY?: string;
+  // 任意: あれば対応する埋め込みプロバイダーを使用。無ければ mock（ローカル動作確認用）。
+  // knowledge-rag の embeddings provider 構成と同じ（lib/ai/embeddings.ts）。
+  OPENAI_API_KEY?: string;
+  VOYAGE_API_KEY?: string;
 }

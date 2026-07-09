@@ -5,6 +5,7 @@ import { CONFIG } from './config.js';
 import { api, ApiError } from './api.js';
 import { renderAncestors, renderDescendants } from './lineage-render.js';
 import { initCommunity, openMyProfile, loadCrossingOptions } from './community.js';
+import { initAi, resetListingUi } from './ai.js';
 
 const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
@@ -30,7 +31,7 @@ function setError(id, err) {
 
 // ---- タブ切り替え -----------------------------------------------------------
 
-const TABS = ['timeline', 'records', 'profile'];
+const TABS = ['timeline', 'records', 'ai', 'profile'];
 
 function switchTab(name) {
   for (const t of TABS) {
@@ -41,6 +42,7 @@ function switchTab(name) {
 
 $('tabbtn-timeline').onclick = () => switchTab('timeline');
 $('tabbtn-records').onclick = () => switchTab('records');
+$('tabbtn-ai').onclick = () => switchTab('ai');
 // プロフィールタブは自分のプロフィールを開く（他人のは投稿者名クリックで遷移）
 $('tabbtn-profile').onclick = () => openMyProfile();
 
@@ -63,6 +65,7 @@ async function refreshSession() {
     show('app-area', true);
     switchTab('timeline');
     initCommunity({ token, me: profile, switchTab });
+    initAi({ token });
     await Promise.all([loadPlants(), loadCrossings()]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 403) {
@@ -242,6 +245,7 @@ async function openDetail(plantId) {
     const { plant, photos } = await api.getPlant(token(), plantId);
     $('detail-title').textContent = `${plant.name}${plant.species ? `（${plant.species}）` : ''}`;
     $('detail-card').dataset.plantId = plant.id;
+    resetListingUi(); // 前に開いた個体の出品文を残さない
 
     const ph = $('detail-photos');
     ph.replaceChildren();

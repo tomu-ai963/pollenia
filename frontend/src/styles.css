@@ -182,6 +182,27 @@ button.like.active { background: var(--danger); color: #fff; border-color: var(-
 .comment-form textarea { min-height: 2.6rem; flex: 1; }
 .comment-form button { margin-top: 0; }
 
+/* ---- AI相談（Phase 3） ---- */
+
+.ai-chat-log {
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.ai-msg {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.5rem 0.8rem;
+  max-width: 85%;
+}
+.ai-msg.user { align-self: flex-end; background: #f4f7ec; }
+.ai-msg.assistant { align-self: flex-start; background: #fff; }
+.ai-msg .who { font-size: 0.7rem; color: var(--muted); }
+.ai-msg .body { white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .profile-stats { display: flex; gap: 0.6rem; align-items: center; margin: 0.4rem 0; flex-wrap: wrap; }
 .follow-user {
   display: flex;

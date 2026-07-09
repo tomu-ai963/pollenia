@@ -46,3 +46,40 @@ export const TRAIT_FRAGRANCE_STRENGTH_MAX = 5;
 // コミュニティ（Phase 2）。★仮決め。
 export const MAX_POST_LEN = 5_000;
 export const MAX_COMMENT_LEN = 2_000;
+
+// ============================================================
+// AI（Phase 3: 育種相談・出品文生成）。★印は仮決め（運用で見直す前提）。
+// ============================================================
+
+// Anthropic API のモデル。knowledge-rag と同じく最新 Opus に固定（コードに直書きしない）。
+export const AI_MODEL = 'claude-opus-4-8';
+export const AI_CONSULT_MAX_TOKENS = 2_048;
+export const AI_LISTING_MAX_TOKENS = 2_048;
+
+// 埋め込み次元（knowledge-rag と同じ。0005_ai.sql の vector(1536) と一致させる）。
+export const EMBEDDING_DIM = 1536;
+
+// RAG 近傍検索の取得件数。★仮決め。
+export const AI_TOP_K = 8;
+
+// 遅延同期でチャンク化する記録の上限（テーブルごと・新しい順）。
+// リクエストあたりの参照データ量とトークン量を青天井にしないための関門。★仮決め。
+export const AI_SYNC_MAX_ROWS_PER_TABLE = 200;
+// 一度に埋め込み API へ渡すテキスト数の上限（初回同期の暴発防止）。
+export const AI_EMBED_BATCH_SIZE = 100;
+// チャンクに含める notes の最大文字数（超過分は切り詰め）。
+export const AI_CHUNK_NOTES_MAX = 500;
+
+// 育種相談チャットの入力上限。
+export const AI_MESSAGE_MAX_LEN = 2_000;
+export const AI_HISTORY_MAX_TURNS = 12;
+
+// レート制限（同一ユーザー）。無料開放期間の暴発防止。★仮決め。
+export const AI_RATE_LIMIT_PER_MINUTE = 5;
+export const AI_RATE_LIMIT_PER_DAY = 100;
+
+// 出品文生成の対象マーケット。
+export const AI_MARKETPLACES = ['mercari', 'yahoo_auction'] as const;
+export type AiMarketplace = (typeof AI_MARKETPLACES)[number];
+// メルカリの商品名上限（プロンプトと出力クランプの両方で使う）。
+export const AI_LISTING_TITLE_MAX = 40;

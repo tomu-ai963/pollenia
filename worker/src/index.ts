@@ -39,6 +39,7 @@ import {
   handleListFollowers,
   handleListFollowing,
 } from './routes/follows';
+import { handleAiConsult, handleAiListing } from './routes/ai';
 
 // ルーティングのみ（ハンドラ実体は routes/）。Phase 1 のエンドポイント:
 //   認証不要
@@ -58,7 +59,10 @@ import {
 //     - POST/DELETE /api/posts/:id/likes、GET/POST /api/posts/:id/comments
 //     - POST /api/follows、DELETE /api/follows/:followee_id
 //     - GET  /api/users/:id、/api/users/:id/posts、/followers、/following
-// スコープ外（Phase 3）: AI / 課金。
+// Phase 3（AI。すべて JWT + profiles 行）:
+//     - POST /api/ai/consult            … 育種相談（自分の記録のみを RAG 参照）
+//     - POST /api/ai/listing            … 出品文自動生成（自分の個体のみ）
+// スコープ外: 課金（Stripe）。
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(req.url);
@@ -158,6 +162,18 @@ async function route(req: Request, env: Env, sql: Sql, pathname: string): Promis
   if (sowingById) {
     if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
     return handleUpdateSowing(req, sql, user, decodeURIComponent(sowingById[1]));
+  }
+
+  // --- Phase 3: AI -----------------------------------------------------------
+
+  if (pathname === '/api/ai/consult') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleAiConsult(req, env, sql, user);
+  }
+
+  if (pathname === '/api/ai/listing') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleAiListing(req, env, sql, user);
   }
 
   // --- Phase 2: コミュニティ ------------------------------------------------
