@@ -444,6 +444,28 @@ async function loadCrossings() {
       };
       btns.appendChild(addSowing);
     }
+
+    // 削除（物理削除・カスケード）。紐づく採種・播種があれば件数を明示して警告する。
+    const del = document.createElement('button');
+    del.className = 'small danger';
+    del.textContent = '削除';
+    del.onclick = async () => {
+      setError('crossing-error', null);
+      const label = title.textContent;
+      const sowingCount = c.harvests.reduce((n, h) => n + h.sowings.length, 0);
+      const warn = c.harvests.length
+        ? `\n\n紐づく採種${c.harvests.length}件・播種${sowingCount}件も一緒に削除されます。`
+        : '';
+      if (!confirm(`交配記録「${label}」を削除しますか？この操作は取り消せません。${warn}`)) return;
+      try {
+        await api.deleteCrossing(token(), c.id);
+        await Promise.all([loadCrossings(), loadCrossingOptions()]);
+      } catch (e) {
+        setError('crossing-error', e);
+      }
+    };
+    btns.appendChild(del);
+
     div.appendChild(btns);
     list.appendChild(div);
   }

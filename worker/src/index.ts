@@ -17,6 +17,7 @@ import {
   handleCreateCrossing,
   handleCreateHarvest,
   handleCreateSowing,
+  handleDeleteCrossing,
   handleListCrossings,
   handleUpdateCrossing,
   handleUpdateSowing,
@@ -52,7 +53,7 @@ import { handleAiConsult, handleAiListing } from './routes/ai';
 //     - GET  /api/me
 //     - GET/POST /api/plants、GET/PATCH/DELETE /api/plants/:id
 //     - POST /api/plants/:id/photos    … Storage 署名アップロードURL発行
-//     - GET/POST /api/crossings、PATCH /api/crossings/:id、POST /api/crossings/:id/harvests
+//     - GET/POST /api/crossings、PATCH/DELETE /api/crossings/:id、POST /api/crossings/:id/harvests
 //     - POST /api/harvests/:id/sowings、PATCH /api/sowings/:id
 //     - GET  /api/plants/:id/lineage?direction=up|down&depth=N
 // Phase 2（コミュニティ。すべて JWT + profiles 行）:
@@ -155,8 +156,10 @@ async function route(req: Request, env: Env, sql: Sql, pathname: string): Promis
 
   const crossingById = pathname.match(/^\/api\/crossings\/([^/]+)$/);
   if (crossingById) {
-    if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
-    return handleUpdateCrossing(req, sql, user, decodeURIComponent(crossingById[1]));
+    const id = decodeURIComponent(crossingById[1]);
+    if (req.method === 'PATCH') return handleUpdateCrossing(req, sql, user, id);
+    if (req.method === 'DELETE') return handleDeleteCrossing(sql, user, id);
+    return errorResponse('METHOD_NOT_ALLOWED');
   }
 
   const harvestSowings = pathname.match(/^\/api\/harvests\/([^/]+)\/sowings$/);

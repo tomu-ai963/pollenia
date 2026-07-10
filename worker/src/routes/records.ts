@@ -203,6 +203,27 @@ export async function handleUpdateCrossing(
   return json({ crossing: rows[0] });
 }
 
+// DELETE /api/crossings/:id — 交配記録の削除（自分のもの限定・物理削除）。
+// crossings に deleted_at 列は無く（soft delete は plants のみ）、
+// seed_harvests → crossings が on delete cascade のため、ぶら下がる採種・播種記録も
+// DB 側で連鎖削除される（0001 のスキーマ設計。交配記録はハード削除＋カスケード前提）。
+// posts.crossing_id / plants.origin_sowing_id は on delete set null のため、
+// 添付投稿・昇格個体そのものは残り、参照だけが外れる。
+export async function handleDeleteCrossing(
+  sql: Sql,
+  user: AuthedUser,
+  crossingId: string,
+): Promise<Response> {
+  if (!isUuid(crossingId)) return errorResponse('NOT_FOUND');
+  const rows = await sql`
+    delete from pollenia.crossings
+    where id = ${crossingId}::uuid and user_id = ${user.uid}::uuid
+    returning id
+  `;
+  if (rows.length === 0) return errorResponse('NOT_FOUND');
+  return json({ ok: true, id: rows[0].id });
+}
+
 // POST /api/crossings/:id/harvests — 採種記録。crossing は自分のもの限定。
 // Request: { harvest_date?, seed_count?, notes? }
 export async function handleCreateHarvest(
