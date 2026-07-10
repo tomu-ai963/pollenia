@@ -248,6 +248,46 @@ details.traits > summary::before { content: "🌿 "; }
 /* 「父」役だけラベンダーに */
 .tree .role:not(:empty) { }
 
+/* ---- カード見出し（タイトル＋閉じるボタン） ----------------------------- */
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.card-head h2 { margin: 0; }
+
+/* ---- チェックボックス（自家受粉など） ----------------------------------- */
+
+label.check-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.85rem;
+  margin-top: 0.7rem;
+}
+label.check-inline input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--honey-deep);
+  cursor: pointer;
+}
+
+/* 自家受粉ON時に無効化した花粉親セレクトをやわらかく沈める */
+.row > div.disabled { opacity: 0.5; }
+select:disabled { cursor: not-allowed; background: var(--line-soft); }
+
+/* ---- 開閉アニメーション（詳細・編集カード） ----------------------------- */
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.revealing { animation: reveal 0.18s ease; }
+
 /* ---- 汎用メッセージ ------------------------------------------------------ */
 
 .error {
@@ -256,6 +296,8 @@ details.traits > summary::before { content: "🌿 "; }
   margin-top: 0.5rem;
 }
 .notice { color: var(--muted); font-size: 0.85rem; }
+.notice.success { color: var(--mint-ink); font-weight: 500; margin-left: 0.5rem; }
+.notice.success::before { content: "✓ "; }
 .hidden { display: none; }
 
 .photos { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.7rem; }

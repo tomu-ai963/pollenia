@@ -47,6 +47,8 @@ export const api = {
   listCrossings: (token) => call('/api/crossings', { token }),
   createCrossing: (token, crossing) =>
     call('/api/crossings', { method: 'POST', token, body: crossing }),
+  updateCrossing: (token, id, patch) =>
+    call(`/api/crossings/${id}`, { method: 'PATCH', token, body: patch }),
   createHarvest: (token, crossingId, harvest) =>
     call(`/api/crossings/${crossingId}/harvests`, { method: 'POST', token, body: harvest }),
   createSowing: (token, harvestId, sowing) =>

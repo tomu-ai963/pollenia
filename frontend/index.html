@@ -221,9 +221,88 @@
         <div id="plant-list"></div>
       </section>
 
+      <!-- 個体を編集 -->
+      <section class="card hidden" id="plant-edit-card">
+        <div class="card-head">
+          <h2>個体を編集</h2>
+          <button class="small ghost" id="btn-plant-edit-close">✕ 閉じる</button>
+        </div>
+        <div class="row">
+          <div>
+            <label>名前（必須）</label>
+            <input id="edit-plant-name" maxlength="200">
+          </div>
+          <div>
+            <label>属・種</label>
+            <input id="edit-plant-species" maxlength="200">
+          </div>
+          <div>
+            <label>公開範囲</label>
+            <select id="edit-plant-visibility">
+              <option value="private">private（自分のみ）</option>
+              <option value="followers">followers</option>
+              <option value="public">public</option>
+            </select>
+          </div>
+        </div>
+        <label>メモ</label>
+        <textarea id="edit-plant-notes"></textarea>
+
+        <details class="traits">
+          <summary>特性（任意）</summary>
+          <div class="row">
+            <div>
+              <label>開花時期</label>
+              <select id="edit-plant-bloom-season">
+                <option value="">未選択</option>
+                <option value="spring">春</option>
+                <option value="early_summer">初夏</option>
+                <option value="summer">夏</option>
+                <option value="autumn">秋</option>
+                <option value="winter">冬</option>
+              </select>
+            </div>
+            <div>
+              <label>香りの強さ（0〜5）</label>
+              <select id="edit-plant-fragrance-strength">
+                <option value="">未選択</option>
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <div>
+              <label>香りの系統</label>
+              <input id="edit-plant-fragrance-type" maxlength="200" placeholder="例: 柑橘系、バニラ系">
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label>草丈（cm）</label>
+              <input id="edit-plant-height-cm" type="number" min="0" step="0.1" inputmode="decimal">
+            </div>
+            <div>
+              <label>花のサイズ（cm）</label>
+              <input id="edit-plant-flower-size-cm" type="number" min="0" step="0.1" inputmode="decimal">
+            </div>
+          </div>
+        </details>
+
+        <button id="btn-save-plant">保存</button>
+        <button class="ghost" id="btn-cancel-plant-edit">キャンセル</button>
+        <span class="notice success hidden" id="plant-edit-success">保存しました。</span>
+        <div class="error" id="plant-edit-error"></div>
+      </section>
+
       <!-- 個体詳細 -->
       <section class="card hidden" id="detail-card">
-        <h2 id="detail-title"></h2>
+        <div class="card-head">
+          <h2 id="detail-title"></h2>
+          <button class="small ghost" id="btn-detail-close">✕ 閉じる</button>
+        </div>
         <div class="photos" id="detail-photos"></div>
         <div class="row">
           <div>
@@ -285,6 +364,10 @@
             <input type="date" id="cross-date">
           </div>
         </div>
+        <label class="check-inline">
+          <input type="checkbox" id="cross-self">
+          <span>🌼 自家受粉（自家受精・母株のみ指定。花粉親＝母木になります）</span>
+        </label>
         <label>メモ</label>
         <textarea id="cross-notes"></textarea>
         <button id="btn-create-crossing">記録する</button>
@@ -294,6 +377,38 @@
       <section class="card">
         <h2>交配記録一覧</h2>
         <div id="crossing-list"></div>
+      </section>
+
+      <!-- 交配記録を編集 -->
+      <section class="card hidden" id="crossing-edit-card">
+        <div class="card-head">
+          <h2>交配記録を編集</h2>
+          <button class="small ghost" id="btn-crossing-edit-close">✕ 閉じる</button>
+        </div>
+        <div class="row">
+          <div>
+            <label>母木（種子親・必須）</label>
+            <select id="edit-cross-seed"></select>
+          </div>
+          <div>
+            <label>花粉親</label>
+            <select id="edit-cross-pollen"></select>
+          </div>
+          <div>
+            <label>交配日</label>
+            <input type="date" id="edit-cross-date">
+          </div>
+        </div>
+        <label class="check-inline">
+          <input type="checkbox" id="edit-cross-self">
+          <span>🌼 自家受粉（自家受精・母株のみ指定。花粉親＝母木になります）</span>
+        </label>
+        <label>メモ</label>
+        <textarea id="edit-cross-notes"></textarea>
+        <button id="btn-save-crossing">保存</button>
+        <button class="ghost" id="btn-cancel-crossing-edit">キャンセル</button>
+        <span class="notice success hidden" id="crossing-edit-success">保存しました。</span>
+        <div class="error" id="crossing-edit-error"></div>
       </section>
       </div><!-- /tab-records -->
     </div>

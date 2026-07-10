@@ -134,6 +134,75 @@ export async function handleCreateCrossing(
   return json({ crossing: rows[0] }, 201);
 }
 
+// PATCH /api/crossings/:id — 交配記録の更新。自分のもの限定。
+// seed_parent_id / pollen_parent_id / cross_date / notes を部分更新する。
+// 親個体は作成時と同じく**自分の未削除個体**に限定。
+// 自家受粉（両親同一）・父不明（pollen_parent_id を null で明示クリア）も許容。
+export async function handleUpdateCrossing(
+  req: Request,
+  sql: Sql,
+  user: AuthedUser,
+  crossingId: string,
+): Promise<Response> {
+  if (!isUuid(crossingId)) return errorResponse('NOT_FOUND');
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return errorResponse('VALIDATION_ERROR', { publicMessage: 'JSON ボディが必要です。' });
+
+  const patch: Record<string, unknown> = {};
+  const parentsToCheck: string[] = [];
+
+  if (body.seed_parent_id !== undefined) {
+    if (!isUuid(body.seed_parent_id)) {
+      return errorResponse('VALIDATION_ERROR', { publicMessage: 'seed_parent_id が不正です。' });
+    }
+    patch.seed_parent_id = body.seed_parent_id;
+    parentsToCheck.push(body.seed_parent_id);
+  }
+
+  if (body.pollen_parent_id !== undefined) {
+    if (body.pollen_parent_id === null) {
+      patch.pollen_parent_id = null; // 父不明として明示クリア
+    } else if (isUuid(body.pollen_parent_id)) {
+      patch.pollen_parent_id = body.pollen_parent_id;
+      parentsToCheck.push(body.pollen_parent_id);
+    } else {
+      return errorResponse('VALIDATION_ERROR', { publicMessage: 'pollen_parent_id が不正です。' });
+    }
+  }
+
+  // 親個体の所有チェック（作成時と同じく自分の未削除個体のみ）。
+  if (parentsToCheck.length) {
+    const owned = await sql`
+      select id from pollenia.plants
+      where id = any(${uuidArrayLiteral(parentsToCheck)}::uuid[])
+        and user_id = ${user.uid}::uuid and deleted_at is null
+    `;
+    const ownedIds = new Set(owned.map((r) => r.id));
+    if (parentsToCheck.some((id) => !ownedIds.has(id))) {
+      return errorResponse('VALIDATION_ERROR', {
+        publicMessage: '親個体は自分の（削除されていない）個体である必要があります。',
+      });
+    }
+  }
+
+  const parsed = parseRecordFields(body, ['cross_date']);
+  if (!parsed.ok) return parsed.response;
+  if (body.cross_date !== undefined) patch.cross_date = parsed.value.cross_date ?? null;
+  if (body.notes !== undefined) patch.notes = parsed.value.notes;
+
+  if (Object.keys(patch).length === 0) {
+    return errorResponse('VALIDATION_ERROR', { publicMessage: '更新項目がありません。' });
+  }
+
+  const rows = await sql`
+    update pollenia.crossings set ${sql(patch)}
+    where id = ${crossingId}::uuid and user_id = ${user.uid}::uuid
+    returning id, seed_parent_id, pollen_parent_id, cross_date, notes, created_at, updated_at
+  `;
+  if (rows.length === 0) return errorResponse('NOT_FOUND');
+  return json({ crossing: rows[0] });
+}
+
 // POST /api/crossings/:id/harvests — 採種記録。crossing は自分のもの限定。
 // Request: { harvest_date?, seed_count?, notes? }
 export async function handleCreateHarvest(
