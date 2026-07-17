@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Pollenia app icon — honeybee with pollen baskets, gold line art -->
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <g transform="translate(0,30)" fill="none" stroke="#C9A227" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- wings: outline only, no fill (transparency) -->
+    <g stroke-width="10">
+      <ellipse cx="316" cy="314" rx="140" ry="56" transform="rotate(35 316 314)"/>
+      <ellipse cx="708" cy="314" rx="140" ry="56" transform="rotate(-35 708 314)"/>
+      <!-- venation -->
+      <g stroke-width="6.5" opacity="0.6">
+        <path d="M416 382 L224 248"/>
+        <path d="M427 356 L312 276"/>
+        <path d="M608 382 L800 248"/>
+        <path d="M597 356 L712 276"/>
+      </g>
+    </g>
+
+    <!-- antennae (elbowed, with tip dots) -->
+    <g stroke-width="10">
+      <path d="M486 252 C478 214 462 186 436 158"/>
+      <path d="M538 252 C546 214 562 186 588 158"/>
+    </g>
+    <circle cx="436" cy="158" r="7" fill="#C9A227" stroke="none"/>
+    <circle cx="588" cy="158" r="7" fill="#C9A227" stroke="none"/>
+
+    <!-- head -->
+    <circle cx="512" cy="308" r="64"/>
+    <circle cx="488" cy="304" r="9" fill="#C9A227" stroke="none"/>
+    <circle cx="536" cy="304" r="9" fill="#C9A227" stroke="none"/>
+
+    <!-- thorax -->
+    <ellipse cx="512" cy="434" rx="98" ry="62"/>
+
+    <!-- abdomen with stripes -->
+    <ellipse cx="512" cy="632" rx="126" ry="138"/>
+    <g stroke-width="11">
+      <path d="M401 564 Q512 590 623 564"/>
+      <path d="M389 626 Q512 654 635 626"/>
+      <path d="M401 688 Q512 714 623 688"/>
+    </g>
+
+    <!-- front legs -->
+    <g stroke-width="10">
+      <path d="M448 480 Q404 522 396 576"/>
+      <path d="M576 480 Q620 522 628 576"/>
+    </g>
+
+    <!-- hind legs -->
+    <g stroke-width="12">
+      <path d="M436 518 Q352 556 330 612"/>
+      <path d="M588 518 Q672 556 694 612"/>
+    </g>
+
+    <!-- pollen baskets (corbiculae): round pollen balls with light fill + shading arcs -->
+    <circle cx="318" cy="668" r="56" fill="#C9A227" fill-opacity="0.15"/>
+    <circle cx="706" cy="668" r="56" fill="#C9A227" fill-opacity="0.15"/>
+    <g stroke-width="8">
+      <path d="M292 640 A38 38 0 0 1 334 622" opacity="0.6"/>
+      <path d="M300 700 A40 40 0 0 0 348 706" opacity="0.35"/>
+      <path d="M732 640 A38 38 0 0 0 690 622" opacity="0.6"/>
+      <path d="M724 700 A40 40 0 0 1 676 706" opacity="0.35"/>
+    </g>
+  </g>
+</svg>
