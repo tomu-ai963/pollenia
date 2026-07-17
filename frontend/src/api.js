@@ -90,6 +90,10 @@ export const api = {
   aiListing: (token, plantId, marketplace) =>
     call('/api/ai/listing', { method: 'POST', token, body: { plant_id: plantId, marketplace } }),
 
+  // 課金 (Phase 4)。Checkout Session を作成し、返る url へフロントがリダイレクトする。
+  createCheckout: (token) => call('/api/billing/checkout', { method: 'POST', token }),
+  createPortal: (token) => call('/api/billing/portal', { method: 'POST', token }),
+
   // 公開ページ（認証不要）
   publicPlant: (plantId) => call(`/public/plants/${plantId}`),
 };

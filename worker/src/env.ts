@@ -23,4 +23,19 @@ export interface Env {
   // knowledge-rag の embeddings provider 構成と同じ（lib/ai/embeddings.ts）。
   OPENAI_API_KEY?: string;
   VOYAGE_API_KEY?: string;
+  // --- Phase 4: 課金（Stripe） ---
+  // Stripe のシークレット・ID はコードに直書きしない（ローカル .dev.vars、本番 wrangler secret）。
+  // 未設定だと /api/billing/* が 500 になる（他機能には影響しない）。
+  STRIPE_SECRET_KEY?: string;
+  // Webhook の署名検証に使う endpoint secret（whsec_...）。
+  STRIPE_WEBHOOK_SECRET?: string;
+  // 円建て月次サブスクの Price ID（price_...）。テストモードの ID で可。
+  STRIPE_PRICE_ID?: string;
+  // Checkout 完了/中断後のリダイレクト先（フロントの絶対 URL）。
+  // 未設定時は lib/stripe.ts のローカル既定にフォールバック。
+  STRIPE_SUCCESS_URL?: string;
+  STRIPE_CANCEL_URL?: string;
+  // Customer Portal（解約・支払い方法変更）から戻るときのリダイレクト先。
+  // 未設定時は lib 側のローカル既定にフォールバック。
+  STRIPE_PORTAL_RETURN_URL?: string;
 }

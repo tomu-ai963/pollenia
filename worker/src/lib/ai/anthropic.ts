@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import {
   AI_CONSULT_MAX_TOKENS,
+  AI_EFFORT,
   AI_LISTING_MAX_TOKENS,
   AI_LISTING_TITLE_MAX,
   AI_MODEL,
@@ -53,16 +54,19 @@ export async function generateConsultAnswer(
     `質問: ${question}`,
   ].join('\n');
 
+  // effort は output_config 内（top-level ではない）。adaptive thinking と併用してコスト最適化。
+  // SDK の型定義に output_config が無いバージョンがあるため、境界で as any に留める（listing と同様）。
   const res = await client.messages.create({
     model: AI_MODEL,
     max_tokens: AI_CONSULT_MAX_TOKENS,
     system: CONSULT_SYSTEM,
     thinking: { type: 'adaptive' },
+    output_config: { effort: AI_EFFORT },
     messages: [
       ...history.map((t) => ({ role: t.role, content: t.content })),
       { role: 'user' as const, content: finalUser },
     ],
-  });
+  } as any);
 
   const text = res.content.find((b) => b.type === 'text');
   return text && 'text' in text ? text.text : '';
@@ -123,7 +127,7 @@ export async function generateListing(
     max_tokens: AI_LISTING_MAX_TOKENS,
     system: LISTING_SYSTEM,
     thinking: { type: 'adaptive' },
-    output_config: { format: { type: 'json_schema', schema: LISTING_SCHEMA } },
+    output_config: { effort: AI_EFFORT, format: { type: 'json_schema', schema: LISTING_SCHEMA } },
     messages: [
       {
         role: 'user',

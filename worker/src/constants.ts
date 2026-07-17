@@ -51,8 +51,11 @@ export const MAX_COMMENT_LEN = 2_000;
 // AI（Phase 3: 育種相談・出品文生成）。★印は仮決め（運用で見直す前提）。
 // ============================================================
 
-// Anthropic API のモデル。knowledge-rag と同じく最新 Opus に固定（コードに直書きしない）。
-export const AI_MODEL = 'claude-opus-4-8';
+// Anthropic API のモデル。有料化（Phase 4）に合わせて Sonnet 5 + effort=medium に変更
+// （コスト最適化。品質と料金のバランス。output_config.effort で思考深度を制御）。
+export const AI_MODEL = 'claude-sonnet-5';
+// 思考/出力の労力。output_config.effort に渡す（top-level ではない）。adaptive thinking と併用。
+export const AI_EFFORT = 'medium';
 export const AI_CONSULT_MAX_TOKENS = 2_048;
 export const AI_LISTING_MAX_TOKENS = 2_048;
 
@@ -74,9 +77,27 @@ export const AI_CHUNK_NOTES_MAX = 500;
 export const AI_MESSAGE_MAX_LEN = 2_000;
 export const AI_HISTORY_MAX_TURNS = 12;
 
-// レート制限（同一ユーザー）。無料開放期間の暴発防止。★仮決め。
+// レート制限（同一ユーザー）。連投・コスト青天井の防止。★仮決め。
+// 有料プラン導入（Phase 4）で「月70回を目安」の月次上限を主軸に据え、
+// 分/日は瞬間的な連打・単日暴発のガードとして残す（lib/ai/rate-limit.ts）。
 export const AI_RATE_LIMIT_PER_MINUTE = 5;
-export const AI_RATE_LIMIT_PER_DAY = 100;
+export const AI_RATE_LIMIT_PER_DAY = 50;
+export const AI_RATE_LIMIT_PER_MONTH = 70;
+
+// ============================================================
+// 課金（Phase 4: Stripe 月額サブスク）。★印は仮決め。
+// ============================================================
+
+// 価格（¥/月）。表示・案内用（実際の課金額は Stripe Price 側が正）。
+export const SUBSCRIPTION_PRICE_JPY = 300;
+
+// AI 機能を許可するサブスク状態。past_due は Stripe の自動リトライ猶予中も含める
+// （即時停止しない設計。0006_billing.sql / lib/stripe.ts のコメント参照）。
+export const SUBSCRIPTION_ENTITLED_STATUSES = ['active', 'past_due'] as const;
+
+// Stripe Webhook 署名検証のタイムスタンプ許容窓（秒）。Stripe 公式デフォルトと同じ 5 分。
+// リプレイ攻撃の窓を絞りつつ、正当な遅延配送を弾かない値。
+export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300;
 
 // 出品文生成の対象マーケット。
 export const AI_MARKETPLACES = ['mercari', 'yahoo_auction'] as const;

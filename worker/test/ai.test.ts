@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseHistory } from '../src/routes/ai';
-import { isAiRateLimited } from '../src/lib/ai/rate-limit';
+import { aiRateLimitReason, isAiRateLimited } from '../src/lib/ai/rate-limit';
 import { normalizeListing } from '../src/lib/ai/anthropic';
 import {
   MockEmbeddingProvider,
@@ -13,6 +13,7 @@ import {
   AI_MESSAGE_MAX_LEN,
   AI_RATE_LIMIT_PER_DAY,
   AI_RATE_LIMIT_PER_MINUTE,
+  AI_RATE_LIMIT_PER_MONTH,
   EMBEDDING_DIM,
 } from '../src/constants';
 
@@ -49,18 +50,39 @@ describe('parseHistory', () => {
   });
 });
 
-describe('isAiRateLimited', () => {
+describe('isAiRateLimited / aiRateLimitReason', () => {
   // counts は「今回の試行を含む」件数（insert → count の順。lib/ai/rate-limit.ts）。
   it('上限件数ちょうどまでは通す', () => {
-    expect(isAiRateLimited({ minute: 1, day: 1 })).toBe(false);
+    expect(isAiRateLimited({ minute: 1, day: 1, month: 1 })).toBe(false);
     expect(
-      isAiRateLimited({ minute: AI_RATE_LIMIT_PER_MINUTE, day: AI_RATE_LIMIT_PER_DAY }),
+      isAiRateLimited({
+        minute: AI_RATE_LIMIT_PER_MINUTE,
+        day: AI_RATE_LIMIT_PER_DAY,
+        month: AI_RATE_LIMIT_PER_MONTH,
+      }),
     ).toBe(false);
+    expect(aiRateLimitReason({ minute: 1, day: 1, month: 1 })).toBeNull();
   });
 
-  it('分・日いずれかの上限超過で拒否', () => {
-    expect(isAiRateLimited({ minute: AI_RATE_LIMIT_PER_MINUTE + 1, day: 10 })).toBe(true);
-    expect(isAiRateLimited({ minute: 1, day: AI_RATE_LIMIT_PER_DAY + 1 })).toBe(true);
+  it('分・日・月いずれかの上限超過で拒否', () => {
+    expect(isAiRateLimited({ minute: AI_RATE_LIMIT_PER_MINUTE + 1, day: 10, month: 10 })).toBe(true);
+    expect(isAiRateLimited({ minute: 1, day: AI_RATE_LIMIT_PER_DAY + 1, month: 10 })).toBe(true);
+    expect(isAiRateLimited({ minute: 1, day: 1, month: AI_RATE_LIMIT_PER_MONTH + 1 })).toBe(true);
+  });
+
+  it('超過理由は 月 > 日 > 分 の優先度で返す', () => {
+    // 3 種すべて超過 → 最も重い month を返す
+    expect(
+      aiRateLimitReason({
+        minute: AI_RATE_LIMIT_PER_MINUTE + 1,
+        day: AI_RATE_LIMIT_PER_DAY + 1,
+        month: AI_RATE_LIMIT_PER_MONTH + 1,
+      }),
+    ).toBe('month');
+    expect(
+      aiRateLimitReason({ minute: AI_RATE_LIMIT_PER_MINUTE + 1, day: AI_RATE_LIMIT_PER_DAY + 1, month: 1 }),
+    ).toBe('day');
+    expect(aiRateLimitReason({ minute: AI_RATE_LIMIT_PER_MINUTE + 1, day: 1, month: 1 })).toBe('minute');
   });
 });
 

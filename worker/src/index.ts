@@ -42,6 +42,7 @@ import {
   handleListFollowing,
 } from './routes/follows';
 import { handleAiConsult, handleAiListing } from './routes/ai';
+import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from './routes/billing';
 
 // ルーティングのみ（ハンドラ実体は routes/）。Phase 1 のエンドポイント:
 //   認証不要
@@ -61,10 +62,13 @@ import { handleAiConsult, handleAiListing } from './routes/ai';
 //     - POST/DELETE /api/posts/:id/likes、GET/POST /api/posts/:id/comments
 //     - POST /api/follows、DELETE /api/follows/:followee_id
 //     - GET  /api/users/:id、/api/users/:id/posts、/followers、/following
-// Phase 3（AI。すべて JWT + profiles 行）:
+// Phase 3（AI。すべて JWT + profiles 行。Phase 4 で有料ゲート化 = active/past_due のみ許可）:
 //     - POST /api/ai/consult            … 育種相談（自分の記録のみを RAG 参照）
 //     - POST /api/ai/listing            … 出品文自動生成（自分の個体のみ）
-// スコープ外: 課金（Stripe）。
+// Phase 4（課金。Stripe 月額サブスク ¥300/月）:
+//     - POST /api/billing/webhook       … Stripe Webhook（認証不要。署名で真正性を担保）
+//     - POST /api/billing/checkout      … Checkout Session 作成（JWT + profiles 行）
+//     - POST /api/billing/portal        … Customer Portal Session 作成（JWT + profiles 行）
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(req.url);
@@ -98,6 +102,12 @@ async function route(req: Request, env: Env, sql: Sql, pathname: string): Promis
   }
 
   if (!pathname.startsWith('/api/')) return errorResponse('NOT_FOUND');
+
+  // --- 認証不要: Stripe Webhook（署名で真正性を担保。JWT は付かない） ------
+  if (pathname === '/api/billing/webhook') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleStripeWebhook(req, env, sql);
+  }
 
   // --- JWT のみ: 初回登録 --------------------------------------------------
   if (pathname === '/api/profiles') {
@@ -184,6 +194,18 @@ async function route(req: Request, env: Env, sql: Sql, pathname: string): Promis
   if (pathname === '/api/ai/listing') {
     if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
     return handleAiListing(req, env, sql, user);
+  }
+
+  // --- Phase 4: 課金（Checkout 作成。Webhook は認証前に処理済み） ------------
+
+  if (pathname === '/api/billing/checkout') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleCreateCheckout(req, env, sql, user);
+  }
+
+  if (pathname === '/api/billing/portal') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleCreatePortal(req, env, sql, user);
   }
 
   // --- Phase 2: コミュニティ ------------------------------------------------

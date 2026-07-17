@@ -12,6 +12,13 @@ const $ = (id) => document.getElementById(id);
 
 let session = null;
 let plants = [];
+let me = null; // 自分の profile（subscription_status を含む）
+
+// AI 機能を利用できるサブスク状態（Worker の SUBSCRIPTION_ENTITLED_STATUSES と揃える）。
+const ENTITLED = new Set(['active', 'past_due']);
+function isSubscribed() {
+  return ENTITLED.has(me?.subscription_status);
+}
 
 function token() {
   return session?.access_token ?? null;
@@ -46,6 +53,75 @@ $('tabbtn-ai').onclick = () => switchTab('ai');
 // プロフィールタブは自分のプロフィールを開く（他人のは投稿者名クリックで遷移）
 $('tabbtn-profile').onclick = () => openMyProfile();
 
+// ---- 課金（プラン加入導線） -------------------------------------------------
+
+const PLAN_LABEL = {
+  active: '加入中（有料プラン）',
+  past_due: '加入中（お支払い確認中）',
+  canceled: '解約済み',
+  free: '未加入（無料）',
+};
+
+function renderPlan() {
+  const status = me?.subscription_status ?? 'free';
+  let label = `現在のプラン: ${PLAN_LABEL[status] ?? status}`;
+  // 次回更新日（Webhook が同期する current_period_end）。加入中のみ添える。
+  if (isSubscribed() && me?.current_period_end) {
+    const d = new Date(me.current_period_end);
+    if (!Number.isNaN(d.getTime())) {
+      label += `（次回更新: ${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}）`;
+    }
+  }
+  $('plan-status').textContent = label;
+  // 未加入・解約済みのときだけ加入ボタン・説明を出す。加入中はポータル導線を出す。
+  show('btn-subscribe', !isSubscribed());
+  show('plan-desc', !isSubscribed());
+  show('btn-portal', isSubscribed());
+}
+
+$('btn-subscribe').onclick = async () => {
+  setError('plan-error', null);
+  $('btn-subscribe').disabled = true;
+  try {
+    const { url } = await api.createCheckout(token());
+    // Stripe Checkout へリダイレクト（成功/中断で success_url/cancel_url に戻る）。
+    window.location.href = url;
+  } catch (e) {
+    setError('plan-error', e);
+    $('btn-subscribe').disabled = false;
+  }
+};
+
+$('btn-portal').onclick = async () => {
+  setError('plan-error', null);
+  $('btn-portal').disabled = true;
+  try {
+    const { url } = await api.createPortal(token());
+    // Stripe Customer Portal へリダイレクト（完了後 return_url でフロントに戻る）。
+    window.location.href = url;
+  } catch (e) {
+    setError('plan-error', e);
+    $('btn-portal').disabled = false;
+  }
+};
+
+// Checkout から戻ってきたとき（?checkout=success|cancel）の案内。
+// 加入直後は Webhook 反映に数秒かかることがあるため、その旨を添える。
+function handleCheckoutReturn() {
+  const params = new URLSearchParams(location.search);
+  const result = params.get('checkout');
+  if (!result) return;
+  switchTab('ai');
+  if (result === 'success') {
+    $('plan-status').textContent =
+      'ご加入ありがとうございます。反映まで数秒かかる場合があります（更新で最新の状態になります）。';
+  } else if (result === 'cancel') {
+    setError('plan-error', new Error('加入手続きをキャンセルしました。'));
+  }
+  // クエリを消してリロード時の再表示を防ぐ。
+  history.replaceState(null, '', location.pathname);
+}
+
 // ---- 認証・登録 -----------------------------------------------------------
 
 async function refreshSession() {
@@ -59,13 +135,16 @@ async function refreshSession() {
   }
   try {
     const { profile } = await api.me(token());
+    me = profile;
     $('who').textContent = profile.display_name;
     show('auth-card', false);
     show('register-card', false);
     show('app-area', true);
     switchTab('timeline');
     initCommunity({ token, me: profile, switchTab });
-    initAi({ token });
+    initAi({ token, isSubscribed });
+    renderPlan();
+    handleCheckoutReturn();
     await Promise.all([loadPlants(), loadCrossings()]);
   } catch (e) {
     if (e instanceof ApiError && e.status === 403) {

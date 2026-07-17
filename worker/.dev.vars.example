@@ -25,3 +25,17 @@ ANTHROPIC_API_KEY="<Anthropic API key>"
 # （ローカル動作確認用。検索精度は落ちるが配線確認には十分）。
 # OPENAI_API_KEY="<OpenAI API key (text-embedding-3-small)>"
 # VOYAGE_API_KEY="<Voyage API key (voyage-3.5)>"
+
+# --- 課金（Phase 4: Stripe 月額サブスク ¥300/月）---
+# すべてテストモードの値で可（本番デプロイ・本番キー設定は完了条件外）。
+# 未設定だと /api/billing/* が 500 になる（他機能には影響しない）。
+STRIPE_SECRET_KEY="<sk_test_...>"
+# `stripe listen` が表示する Webhook 署名シークレット（whsec_...）。
+STRIPE_WEBHOOK_SECRET="<whsec_...>"
+# 円建て月次サブスクの Price ID（price_...）。Stripe ダッシュボード（テスト）で作成。
+STRIPE_PRICE_ID="<price_...>"
+# Checkout 後のリダイレクト先（未設定時はローカル既定にフォールバック）。
+# STRIPE_SUCCESS_URL="http://127.0.0.1:8788/?checkout=success"
+# STRIPE_CANCEL_URL="http://127.0.0.1:8788/?checkout=cancel"
+# Customer Portal（解約・支払い方法変更）から戻るリダイレクト先（未設定時はローカル既定）。
+# STRIPE_PORTAL_RETURN_URL="http://127.0.0.1:8788/"

@@ -50,10 +50,12 @@ export async function handleCreateProfile(
   return json({ profile: existing[0] }, 200);
 }
 
-// GET /api/me — 自分のプロフィール。
+// GET /api/me — 自分のプロフィール。subscription_status を含める（フロントの加入導線/AI ゲート判定用。
+// stripe_customer_id 等の内部 ID はクライアントに返さない）。
 export async function handleGetMe(sql: Sql, user: AuthedUser): Promise<Response> {
   const rows = await sql`
-    select id, display_name, bio, avatar_path, created_at, updated_at
+    select id, display_name, bio, avatar_path, subscription_status, current_period_end,
+      created_at, updated_at
     from pollenia.profiles where id = ${user.uid}::uuid
   `;
   if (rows.length === 0) return errorResponse('NOT_FOUND');

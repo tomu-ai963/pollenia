@@ -10,8 +10,13 @@ const $ = (id) => document.getElementById(id);
 const HISTORY_MAX = 12;
 
 let tokenFn = null;
+let subscribedFn = () => true; // 加入状態を返す（app.js から注入）
 let history = []; // {role: 'user'|'assistant', content: string}
 let sending = false;
+
+// 未加入時の共通導線メッセージ（AI相談タブのプランカードへ誘導）。
+const NEED_SUBSCRIBE_MSG =
+  'この機能のご利用には有料プランへの加入が必要です。「AI相談」タブの「プラン」からご加入ください。';
 
 function setError(id, err) {
   $(id).textContent = err
@@ -44,6 +49,12 @@ async function sendConsult() {
   if (!message) return;
   setError('ai-error', null);
 
+  // 未加入なら API を叩かず導線を表示（同タブ上部のプランカードで加入できる）。
+  if (!subscribedFn()) {
+    setError('ai-error', new Error(NEED_SUBSCRIBE_MSG));
+    return;
+  }
+
   sending = true;
   $('btn-ai-send').disabled = true;
   appendChatMessage('user', message);
@@ -72,6 +83,12 @@ async function generateListing() {
   if (!plantId) return;
   setError('listing-error', null);
   $('listing-copied').textContent = '';
+
+  // 出品文生成も有料機能。未加入なら導線を表示して API を叩かない。
+  if (!subscribedFn()) {
+    setError('listing-error', new Error(NEED_SUBSCRIBE_MSG));
+    return;
+  }
   const btn = $('btn-generate-listing');
   btn.disabled = true;
   btn.textContent = '生成中…';
@@ -94,8 +111,9 @@ function copyToClipboard(text, label) {
   });
 }
 
-export function initAi({ token }) {
+export function initAi({ token, isSubscribed }) {
   tokenFn = token;
+  if (typeof isSubscribed === 'function') subscribedFn = isSubscribed;
 
   $('btn-ai-send').onclick = sendConsult;
   $('btn-ai-clear').onclick = () => {

@@ -56,6 +56,18 @@
 
       <!-- AI相談（Phase 3） -->
       <div id="tab-ai" class="hidden">
+        <!-- 有料プラン（Phase 4）。加入状態表示 + 加入導線。 -->
+        <section class="card" id="plan-card">
+          <h2>プラン</h2>
+          <p class="notice" id="plan-status">読み込み中…</p>
+          <p class="notice" id="plan-desc">
+            AI機能（育種相談・出品文生成）は有料プラン（¥300/月）でご利用いただけます。
+          </p>
+          <button id="btn-subscribe" class="hidden">有料プランに加入（¥300/月）</button>
+          <button id="btn-portal" class="ghost hidden">お支払いの管理（解約・カード変更）</button>
+          <div class="error" id="plan-error"></div>
+        </section>
+
         <section class="card">
           <h2>育種相談AI</h2>
           <p class="notice">

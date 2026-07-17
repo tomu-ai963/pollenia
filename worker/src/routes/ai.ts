@@ -14,9 +14,16 @@ import { buildListingFacts, collectUserSources } from '../lib/ai/context';
 import { createEmbeddingProvider } from '../lib/ai/embeddings';
 import { retrieveUserChunks, syncUserChunks } from '../lib/ai/rag';
 import { generateConsultAnswer, generateListing, type ChatTurn } from '../lib/ai/anthropic';
-import { consumeAiUsage, isAiRateLimited } from '../lib/ai/rate-limit';
+import {
+  aiRateLimitMessage,
+  aiRateLimitReason,
+  consumeAiUsage,
+} from '../lib/ai/rate-limit';
+import { requireActiveSubscription } from '../lib/stripe';
 
-// AI エンドポイント（Phase 3）。すべて JWT + profiles 行を要求（index.ts の共通認証を通過済み）。
+// AI エンドポイント（Phase 3。Phase 4 で有料ゲート化）。
+// すべて JWT + profiles 行を要求（index.ts の共通認証を通過済み）。加えて subscription_status が
+// active/past_due（有料相当）でなければ 402（requireActiveSubscription）。
 // 参照データは常に「認証済みユーザー自身の記録」だけ（lib/ai/context.ts / rag.ts が uid で絞る）。
 // Anthropic API キーはフロントに渡さず、この Worker 経由でのみ呼び出す。
 
@@ -35,6 +42,10 @@ export async function handleAiConsult(
     return errorResponse('INTERNAL_ERROR', { detail: 'ANTHROPIC_API_KEY is not configured' });
   }
 
+  // 有料ゲート: 未加入（free/canceled）は 402。
+  const sub = await requireActiveSubscription(sql, user.uid);
+  if (!sub.ok) return sub.response;
+
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return errorResponse('VALIDATION_ERROR', { publicMessage: 'JSON ボディが必要です。' });
 
@@ -50,7 +61,8 @@ export async function handleAiConsult(
 
   // insert → count（advisory lock で直列化）の順で TOCTOU を防ぐ（lib/ai/rate-limit.ts）
   const counts = await consumeAiUsage(sql, user.uid, 'consult');
-  if (isAiRateLimited(counts)) return errorResponse('RATE_LIMITED');
+  const limited = aiRateLimitReason(counts);
+  if (limited) return errorResponse('RATE_LIMITED', { publicMessage: aiRateLimitMessage(limited) });
 
   const provider = createEmbeddingProvider(env);
   try {
@@ -89,6 +101,10 @@ export async function handleAiListing(
     return errorResponse('INTERNAL_ERROR', { detail: 'ANTHROPIC_API_KEY is not configured' });
   }
 
+  // 有料ゲート: 未加入（free/canceled）は 402。
+  const sub = await requireActiveSubscription(sql, user.uid);
+  if (!sub.ok) return sub.response;
+
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return errorResponse('VALIDATION_ERROR', { publicMessage: 'JSON ボディが必要です。' });
 
@@ -111,7 +127,8 @@ export async function handleAiListing(
   const plant = rows[0];
 
   const counts = await consumeAiUsage(sql, user.uid, 'listing');
-  if (isAiRateLimited(counts)) return errorResponse('RATE_LIMITED');
+  const limited = aiRateLimitReason(counts);
+  if (limited) return errorResponse('RATE_LIMITED', { publicMessage: aiRateLimitMessage(limited) });
 
   try {
     const facts = await buildListingFacts(sql, user.uid, plant as never);

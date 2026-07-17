@@ -13,6 +13,7 @@
 //   NOT_FOUND          404  対象なし・または閲覧不可（存在を秘匿するため 403 と使い分けない）
 //   METHOD_NOT_ALLOWED 405  非対応メソッド
 //   CONFLICT           409  重複登録等
+//   PAYMENT_REQUIRED   402  有料プラン未加入（AI 機能の有料ゲート）
 //   RATE_LIMITED       429  レート制限（AI 呼び出しの連投等）
 //   INTERNAL_ERROR     500  想定外 / DB エラー（詳細はログのみ）
 import { json } from './http';
@@ -24,6 +25,7 @@ export type ErrorCode =
   | 'NOT_FOUND'
   | 'METHOD_NOT_ALLOWED'
   | 'CONFLICT'
+  | 'PAYMENT_REQUIRED'
   | 'RATE_LIMITED'
   | 'INTERNAL_ERROR';
 
@@ -40,6 +42,7 @@ const ERROR_TABLE: Record<ErrorCode, ErrorSpec> = {
   NOT_FOUND: { status: 404, message: '対象が見つかりません。' },
   METHOD_NOT_ALLOWED: { status: 405, message: 'このメソッドは許可されていません。' },
   CONFLICT: { status: 409, message: 'すでに登録されています。' },
+  PAYMENT_REQUIRED: { status: 402, message: 'この機能のご利用には有料プランへの加入が必要です。' },
   RATE_LIMITED: { status: 429, message: 'リクエストが多すぎます。時間をおいて再度お試しください。' },
   INTERNAL_ERROR: { status: 500, message: 'サーバー内部でエラーが発生しました。' },
 };
