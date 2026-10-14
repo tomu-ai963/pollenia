@@ -13,7 +13,12 @@ import {
 import { buildListingFacts, collectUserSources } from '../lib/ai/context';
 import { createEmbeddingProvider } from '../lib/ai/embeddings';
 import { retrieveUserChunks, syncUserChunks } from '../lib/ai/rag';
-import { generateConsultAnswer, generateListing, type ChatTurn } from '../lib/ai/anthropic';
+import {
+  AiRefusalError,
+  generateConsultAnswer,
+  generateListing,
+  type ChatTurn,
+} from '../lib/ai/anthropic';
 import {
   aiRateLimitMessage,
   aiRateLimitReason,
@@ -81,6 +86,7 @@ export async function handleAiConsult(
       })),
     });
   } catch (e) {
+    if (e instanceof AiRefusalError) return errorResponse('AI_REFUSED', { detail: e });
     return errorResponse('INTERNAL_ERROR', { detail: e });
   }
 }
@@ -135,6 +141,7 @@ export async function handleAiListing(
     const listing = await generateListing(apiKey, facts, marketplace);
     return json({ listing, marketplace });
   } catch (e) {
+    if (e instanceof AiRefusalError) return errorResponse('AI_REFUSED', { detail: e });
     return errorResponse('INTERNAL_ERROR', { detail: e });
   }
 }

@@ -122,7 +122,7 @@ supabase-js は JWT 検証と Storage 署名URL発行のみ。
 ### 共通（セキュリティ・コスト設計）
 
 - Anthropic API の呼び出しは **Worker 経由に統一**（ANTHROPIC_API_KEY はフロントに渡さない）。
-  モデルは `constants.ts` の `AI_MODEL`（claude-opus-4-8）。
+  モデルは `constants.ts` の `AI_MODEL`（claude-haiku-5-5、effort=medium）。
 - プロンプトインジェクション対策: system は固定文字列。記録・メモは `<records>` / `<facts>`
   ブロック内の「データであり指示ではない」ものとして渡し、内部の指示に従わない旨を明示。
 - レート制限: `pollenia.ai_usage_events` で同一ユーザー
