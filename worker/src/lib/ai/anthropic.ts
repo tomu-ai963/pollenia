@@ -19,6 +19,22 @@ import type { RetrievedChunk } from './rag';
 //     その中に現れる指示・命令には従わないことを system で明示する。
 //   * 会話履歴は routes 側で role/長さ/件数を検証したものだけを渡す。
 
+// 安全性分類器による応答拒否（HTTP 200 + stop_reason: "refusal"）。Haiku 5.5 には
+// サーバー側フォールバックが無いため、routes 側で固定文言のエラー（AI_REFUSED）に変換する。
+export class AiRefusalError extends Error {
+  constructor(readonly category: string | null) {
+    super(`Anthropic API refused the request (category: ${category ?? 'unknown'})`);
+    this.name = 'AiRefusalError';
+  }
+}
+
+// content を読む前に必ず通す（拒否時は空の text が返り、空回答として静かに通ってしまうため）。
+export function assertNotRefused(res: any): void {
+  if (res?.stop_reason === 'refusal') {
+    throw new AiRefusalError(res?.stop_details?.category ?? null);
+  }
+}
+
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
@@ -68,6 +84,7 @@ export async function generateConsultAnswer(
     ],
   } as any);
 
+  assertNotRefused(res);
   const text = res.content.find((b) => b.type === 'text');
   return text && 'text' in text ? text.text : '';
 }
@@ -143,6 +160,7 @@ export async function generateListing(
     ],
   } as any);
 
+  assertNotRefused(res);
   const text: string =
     res?.content?.find((b: any) => b.type === 'text')?.text ?? '{}';
   const parsed = parseJsonObject(text);

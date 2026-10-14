@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseHistory } from '../src/routes/ai';
 import { aiRateLimitReason, isAiRateLimited } from '../src/lib/ai/rate-limit';
-import { normalizeListing } from '../src/lib/ai/anthropic';
+import { AiRefusalError, assertNotRefused, normalizeListing } from '../src/lib/ai/anthropic';
 import {
   MockEmbeddingProvider,
   toFixedDim,
@@ -109,6 +109,27 @@ describe('normalizeListing', () => {
     expect(normalizeListing({}, 'mercari')).toEqual({ title: '', body: '' });
     expect(normalizeListing({ title: 1, body: null }, 'mercari')).toEqual({ title: '', body: '' });
     expect(normalizeListing(null, 'mercari')).toEqual({ title: '', body: '' });
+  });
+});
+
+describe('assertNotRefused', () => {
+  it('stop_reason が refusal なら AiRefusalError（category 付き）', () => {
+    const res = { stop_reason: 'refusal', stop_details: { type: 'refusal', category: 'bio' }, content: [] };
+    expect(() => assertNotRefused(res)).toThrow(AiRefusalError);
+    try {
+      assertNotRefused(res);
+    } catch (e) {
+      expect((e as AiRefusalError).category).toBe('bio');
+    }
+  });
+
+  it('category が null でも AiRefusalError', () => {
+    expect(() => assertNotRefused({ stop_reason: 'refusal', stop_details: null })).toThrow(AiRefusalError);
+  });
+
+  it('end_turn / max_tokens は通す', () => {
+    expect(() => assertNotRefused({ stop_reason: 'end_turn' })).not.toThrow();
+    expect(() => assertNotRefused({ stop_reason: 'max_tokens' })).not.toThrow();
   });
 });
 

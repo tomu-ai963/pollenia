@@ -15,6 +15,7 @@
 //   CONFLICT           409  重複登録等
 //   PAYMENT_REQUIRED   402  有料プラン未加入（AI 機能の有料ゲート）
 //   RATE_LIMITED       429  レート制限（AI 呼び出しの連投等）
+//   AI_REFUSED         422  AI が安全性の判定で応答を拒否（stop_reason: refusal。分類はログのみ）
 //   INTERNAL_ERROR     500  想定外 / DB エラー（詳細はログのみ）
 import { json } from './http';
 
@@ -27,6 +28,7 @@ export type ErrorCode =
   | 'CONFLICT'
   | 'PAYMENT_REQUIRED'
   | 'RATE_LIMITED'
+  | 'AI_REFUSED'
   | 'INTERNAL_ERROR';
 
 interface ErrorSpec {
@@ -44,6 +46,10 @@ const ERROR_TABLE: Record<ErrorCode, ErrorSpec> = {
   CONFLICT: { status: 409, message: 'すでに登録されています。' },
   PAYMENT_REQUIRED: { status: 402, message: 'この機能のご利用には有料プランへの加入が必要です。' },
   RATE_LIMITED: { status: 429, message: 'リクエストが多すぎます。時間をおいて再度お試しください。' },
+  AI_REFUSED: {
+    status: 422,
+    message: 'この内容には AI が回答できませんでした。表現を変えて再度お試しください。',
+  },
   INTERNAL_ERROR: { status: 500, message: 'サーバー内部でエラーが発生しました。' },
 };
 

@@ -51,9 +51,9 @@ export const MAX_COMMENT_LEN = 2_000;
 // AI（Phase 3: 育種相談・出品文生成）。★印は仮決め（運用で見直す前提）。
 // ============================================================
 
-// Anthropic API のモデル。有料化（Phase 4）に合わせて Sonnet 5 + effort=medium に変更
-// （コスト最適化。品質と料金のバランス。output_config.effort で思考深度を制御）。
-export const AI_MODEL = 'claude-sonnet-5';
+// Anthropic API のモデル。Haiku 5.5 + effort=medium（コスト最適化。output_config.effort で
+// 思考深度を制御。Haiku 5.5 の既定も medium だが明示しておく）。
+export const AI_MODEL = 'claude-haiku-5-5';
 // 思考/出力の労力。output_config.effort に渡す（top-level ではない）。adaptive thinking と併用。
 export const AI_EFFORT = 'medium';
 export const AI_CONSULT_MAX_TOKENS = 2_048;
