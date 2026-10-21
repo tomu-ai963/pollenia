@@ -11,6 +11,7 @@ node_modules/
 **/.env.*
 *.pem
 *.key
+*.bak
 
 # === Cloudflare Workers / wrangler ===
 .wrangler/
@@ -19,7 +20,7 @@ dist/
 **/dist/
 .mf/
 
-# === Supabase ローカル（Docker/CLI 一時ファイル）===
+# === Supabase ローカル（旧構成の CLI 一時ファイル。Neon 移行後は不要）===
 supabase/.branches/
 supabase/.temp/
 supabase/.env

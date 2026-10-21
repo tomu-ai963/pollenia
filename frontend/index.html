@@ -13,30 +13,62 @@
     <h1>🌸 Pollenia</h1>
     <div>
       <span class="who" id="who"></span>
-      <button class="small ghost" id="btn-signout">ログアウト</button>
+      <button class="small ghost hidden" id="btn-signout">ログアウト</button>
     </div>
   </header>
 
   <main>
-    <!-- 認証 -->
-    <section class="card" id="auth-card">
+    <!-- 認証（workers-auth deviceAuth）
+         新しい端末: メール → 6桁コード → （未設定なら）PIN 設定
+         信頼済み端末: PIN だけ。3回間違えるとメールコードからやり直し -->
+    <section class="card hidden" id="auth-card">
       <h2>ログイン / 新規登録</h2>
-      <div class="row">
-        <div>
-          <label>メールアドレス</label>
-          <input type="email" id="auth-email" autocomplete="email">
-        </div>
-        <div>
-          <label>パスワード</label>
-          <input type="password" id="auth-password" autocomplete="current-password">
-        </div>
+
+      <!-- 1. メールアドレス（初めての方もここから。アカウントは自動で作られます） -->
+      <div id="auth-step-email" class="hidden">
+        <p class="notice">メールアドレスに届く6桁のコードでログインします。初めての方もそのままどうぞ。</p>
+        <label>メールアドレス</label>
+        <input type="email" id="auth-email" autocomplete="email">
+        <button id="btn-email-start">コードを送る</button>
       </div>
-      <button id="btn-signin">ログイン</button>
-      <button class="ghost" id="btn-signup">アカウント作成</button>
+
+      <!-- 2. メールのコード -->
+      <div id="auth-step-code" class="hidden">
+        <p class="notice" id="auth-code-notice"></p>
+        <label>6桁のコード</label>
+        <input id="auth-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+        <button id="btn-email-verify">ログイン</button>
+        <button class="ghost" id="btn-code-back">メールアドレスを変える</button>
+      </div>
+
+      <!-- 3. PIN の設定（メールコードでログインした直後、PIN が未設定のとき） -->
+      <div id="auth-step-pin-set" class="hidden">
+        <p class="notice">次回からこの端末では PIN だけでログインできます。推測されにくい数字にしてください。</p>
+        <div class="row">
+          <div>
+            <label>PIN（6桁の数字）</label>
+            <input type="password" id="auth-pin-new" inputmode="numeric" autocomplete="new-password" maxlength="6">
+          </div>
+          <div>
+            <label>PIN（確認）</label>
+            <input type="password" id="auth-pin-confirm" inputmode="numeric" autocomplete="new-password" maxlength="6">
+          </div>
+        </div>
+        <button id="btn-pin-set">PIN を設定する</button>
+      </div>
+
+      <!-- 4. 信頼済み端末: PIN だけでログイン -->
+      <div id="auth-step-pin" class="hidden">
+        <label>PIN</label>
+        <input type="password" id="auth-pin" inputmode="numeric" autocomplete="current-password" maxlength="6">
+        <button id="btn-pin-login">ログイン</button>
+        <button class="ghost" id="btn-pin-use-email">メールのコードでログイン</button>
+      </div>
+
       <div class="error" id="auth-error"></div>
     </section>
 
-    <!-- Pollenia 初回登録（JWT はあるが profiles 行がない状態） -->
+    <!-- Pollenia 初回登録（ログイン済みだが profiles 行がない状態） -->
     <section class="card hidden" id="register-card">
       <h2>Pollenia へようこそ</h2>
       <p class="notice">表示名を決めて登録を完了してください。</p>

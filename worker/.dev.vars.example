@@ -1,41 +1,37 @@
-# ローカル開発用シークレットのテンプレート。
-# このファイルを `.dev.vars` にコピーして値を埋める（.dev.vars はコミット禁止）。
-# wrangler dev はカレントの .dev.vars を自動で env に注入する。
+# ローカル開発用シークレットのテンプレート（.dev.vars はコミット禁止）。
+# `npm run db:up` が .dev.vars に無いキー（DEVICE_AUTH_SECRET / MOCK_MAIL / PIN_PBKDF2_ITERATIONS）を
+# 生成して追記する。それ以外は手で埋める。wrangler dev はカレントの .dev.vars を env に注入する。
+#
+# DB 接続はここに置かない（npm run dev がリポジトリ直下 .env の DATABASE_URL を Hyperdrive の
+# ローカル接続先として渡す。scripts/dev.mjs）。
 
-# --- Supabase (tomu-system プロジェクトに間借り) ---
-# Auth の JWT 検証（auth.getUser）と Storage の署名URL発行にのみ使う。
-# DB アクセスには使わない（pollenia スキーマは PostgREST 非露出のため — README「掟」6）。
-SUPABASE_URL="http://127.0.0.1:54321"
-SUPABASE_SERVICE_ROLE_KEY="<supabase start が表示する service_role key>"
-
-# --- Postgres 接続（フォールバック用・通常は不要）---
-# 通常の接続経路は wrangler.toml の Hyperdrive バインディング:
-#   ローカル: localConnectionString が HYPERDRIVE.connectionString に注入される
-#   本番:     wrangler hyperdrive create で作った設定（接続情報は Cloudflare 側にのみ保存）
-# DATABASE_URL はバインディングなしで動かすときのフォールバック。
-# 通常はコメントアウトのままでよい（lib/db.ts は HYPERDRIVE を優先する）。
-# DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+# --- ログイン（workers-auth deviceAuth）---
+# 32 文字以上・十分なエントロピー。写真 URL の署名鍵もここから派生する。本番は wrangler secret put。
+DEVICE_AUTH_SECRET="<npm run db:up が生成>"
+# ローカルではログインコードを wrangler dev のログに出す（localhost からのリクエストだけで効く）。
+MOCK_MAIL="1"
+# PIN の PBKDF2 反復回数。ローカルは軽くしてよい（本番は未設定 = 100,000）。
+PIN_PBKDF2_ITERATIONS="1000"
+# 実メールを試すときだけ（MOCK_MAIL を消して設定する）。送信元は tomu-ai.dev のアドレス。
+# RESEND_API_KEY="<re_...>"
+# MAIL_FROM="Pollenia <noreply@tomu-ai.dev>"
 
 # --- AI（Phase 3: 育種相談・出品文生成）---
 # Anthropic API キー。未設定だと /api/ai/* は 500 になる（他機能には影響しない）。
-# 本番は wrangler secret put ANTHROPIC_API_KEY。
 ANTHROPIC_API_KEY="<Anthropic API key>"
 
-# 埋め込みプロバイダー（任意）。どちらも無ければ決定的な mock 埋め込みで動く
-# （ローカル動作確認用。検索精度は落ちるが配線確認には十分）。
+# 埋め込みプロバイダー（任意）。どちらも無ければ決定的な mock 埋め込みで動く。
 # OPENAI_API_KEY="<OpenAI API key (text-embedding-3-small)>"
 # VOYAGE_API_KEY="<Voyage API key (voyage-3.5)>"
 
 # --- 課金（Phase 4: Stripe 月額サブスク ¥300/月）---
-# すべてテストモードの値で可（本番デプロイ・本番キー設定は完了条件外）。
-# 未設定だと /api/billing/* が 500 になる（他機能には影響しない）。
+# すべてテストモードの値で可。未設定だと /api/billing/* が 500 になる（他機能には影響しない）。
 STRIPE_SECRET_KEY="<sk_test_...>"
 # `stripe listen` が表示する Webhook 署名シークレット（whsec_...）。
 STRIPE_WEBHOOK_SECRET="<whsec_...>"
-# 円建て月次サブスクの Price ID（price_...）。Stripe ダッシュボード（テスト）で作成。
+# 円建て月次サブスクの Price ID（price_...）。
 STRIPE_PRICE_ID="<price_...>"
-# Checkout 後のリダイレクト先（未設定時はローカル既定にフォールバック）。
-# STRIPE_SUCCESS_URL="http://127.0.0.1:8788/?checkout=success"
-# STRIPE_CANCEL_URL="http://127.0.0.1:8788/?checkout=cancel"
-# Customer Portal（解約・支払い方法変更）から戻るリダイレクト先（未設定時はローカル既定）。
-# STRIPE_PORTAL_RETURN_URL="http://127.0.0.1:8788/"
+# Checkout / Customer Portal 後の戻り先（未設定時はローカル既定 http://localhost:8787/ 系）。
+# STRIPE_SUCCESS_URL="http://localhost:8787/?checkout=success"
+# STRIPE_CANCEL_URL="http://localhost:8787/?checkout=cancel"
+# STRIPE_PORTAL_RETURN_URL="http://localhost:8787/"

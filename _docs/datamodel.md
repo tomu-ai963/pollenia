@@ -1,7 +1,8 @@
 # Pollenia データモデル
 
-マイグレーション: `supabase/migrations/0001_init.sql`（実体）、`0002_rls.sql`（RLS）、
-`0003_community.sql`、`0004_plant_traits.sql`、`0005_ai.sql`（AI: pgvector + ai_chunks + ai_usage_events）
+マイグレーション: `db/migrations/0001_schema.sql`（Pollenia の全テーブル・関数・RLS。旧 supabase/migrations
+0001〜0006 を Neon 移行時に統合）、`0002_workers_auth.sql`（workers-auth の auth_* テーブル）。
+ログイン主体は `pollenia.users`（メールアドレス）で、`profiles.id` がそれを参照する（旧 `auth.users` の代わり）。
 
 ## テーブル一覧
 
@@ -27,7 +28,7 @@ profiles ──┬─ plants ──────────┐
 | 自家受粉（両親同一）を許容 | 実際の育種操作として正当 |
 | `plants` は soft delete（deleted_at）+ FK は RESTRICT | 系統記録はユーザー資産。親個体の物理削除で他人の見る系統樹が壊れることを防ぐ |
 | `sowings.germination_count` を初期から追加 | 有料機能「発芽率グラフ」の元データ。後から足すと過去データが欠損する |
-| `photo_url` → `plant_photos` テーブル + `storage_path` | 個体写真は成長記録として複数枚が自然。URL でなくパス保存（署名付きURLを都度発行） |
+| `photo_url` → `plant_photos` テーブル + `storage_path` | 個体写真は成長記録として複数枚が自然。URL でなく R2 のキーを保存（Worker が署名付きURLを都度発行）。`uploaded_at` が null の行は未アップロード |
 | `species` カラム追加 | 検索軸として必要。まず自由入力、需要が出たらマスタ化 |
 | 全テーブルに created_at / updated_at | 標準装備（updated_at はトリガーで自動更新） |
 

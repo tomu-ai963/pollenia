@@ -2,31 +2,42 @@ name = "pollenia-worker"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 
-# @supabase/supabase-js / postgres (postgres.js) を Workers ランタイムで動かすために必要。
-# postgres.js は cloudflare:sockets 経由の TCP 直接続を使う（PostgREST 非経由。
-# pollenia スキーマを PostgREST に露出しないまま DB アクセスするための構成 — README「掟」6 参照）。
+# postgres.js（cloudflare:sockets 経由の TCP 接続）を Workers ランタイムで動かすために必要。
 compatibility_flags = ["nodejs_compat"]
 
-# シークレット (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY) は
+# シークレット（DEVICE_AUTH_SECRET / RESEND_API_KEY / ANTHROPIC_API_KEY / STRIPE_* など）は
 # コードにも wrangler.toml にも書かない。ローカルは .dev.vars、本番は `wrangler secret put`。
-# .dev.vars.example を .dev.vars にコピーして値を埋める。
+# .dev.vars.example を参照。
+
+# --- 画面（frontend/ をそのまま静的配信。ビルドなし）---
+# 静的ファイルに一致したパスは Worker を通らずに返る。一致しないパス（/api/*・/auth/*・
+# /public/plants/*・/photos/*）が Worker に来る。画面と API が同じオリジンになるので、
+# 認証は Cookie（workers-auth の transport: 'cookie'）で CORS は不要。
+[assets]
+directory = "../frontend"
+binding = "ASSETS"
+
+# --- 写真（R2）---
+# 本番前に一度だけ作成する: npx wrangler r2 bucket create pollenia-photos
+# ローカルの wrangler dev では Miniflare のローカルストレージ（.wrangler/state）になる。
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "pollenia-photos"
 
 # --- Hyperdrive（本番の DB 接続。lib/db.ts が HYPERDRIVE.connectionString を最優先で使う）---
-# 本番デプロイ前に一度だけ Hyperdrive 設定を作成し、下の id を出力値で差し替える:
-#   npx wrangler hyperdrive create pollenia-db \
-#     --connection-string="postgres://postgres:<PASSWORD>@db.<project-ref>.supabase.co:5432/postgres"
+# 本番デプロイ前に一度だけ Neon を origin にした Hyperdrive 設定を作成し、下の id を出力値で差し替える:
+#   npx wrangler hyperdrive create pollenia-neon --caching-disabled \
+#     --connection-string="<Neon の直接接続（-pooler なし）の接続文字列>"
+# --caching-disabled は必須（workers-auth の pg ストアの要件。キャッシュされた SELECT で
+# 失効済みセッションや使用済みコードが通らないようにする）。
 # 接続文字列（パスワード含む）は Cloudflare 側の Hyperdrive 設定にのみ保存され、
 # コード・この toml・シークレットのどこにも置かない。
 #
-# 接続先の選定（Cloudflare 公式ドキュメントの推奨）:
-#   Supabase を origin にする場合は Supavisor pooler ではなく Direct connection を使う
-#   （Hyperdrive 自体が transaction モードのプーラーであり、プーラーの多段化を避けるため）。
-#   Direct connection は IPv6 のため、到達できない場合（IPv4 add-on なし等）は
-#   Supavisor session モード（ポート 5432）を第2候補にする。transaction モード(6543)は使わない。
+# 下の id は未作成を示すダミー（旧 Supabase 用の設定 786b6bea... は使わない）。
+# この値のままでは deploy が失敗する（意図的）。
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "786b6bea7dfe4a94a50079c5f8bd0ba1"  # pollenia-db（origin: Supabase Direct connection 5432）
-# ローカル開発では wrangler dev がこの値を HYPERDRIVE.connectionString として注入する
-# （id は参照されず、Hyperdrive のクエリキャッシュも効かない — 公式ドキュメント）。
-# 値は supabase start のローカル既定で、秘匿情報ではない。
-localConnectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+id = "00000000000000000000000000000000"
+# ローカルの接続先は toml に書かない（パスワードがランダム生成のため）。`npm run dev` が
+# リポジトリ直下 .env の DATABASE_URL を CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE
+# として wrangler dev に渡す（scripts/dev.mjs）。

@@ -1,0 +1,37 @@
+# ローカル開発用の Postgres（pgvector 入り）。本番は Neon。
+#
+# Worker は postgres.js の TCP 接続（ローカルは wrangler dev の Hyperdrive
+# localConnectionString、本番は Hyperdrive → Neon）なので、Neon HTTP プロキシは要らない。
+#
+# Neon の構成に寄せて、アプリ（Worker）とマイグレーションはスーパーユーザーではない
+# 所有者ロール pollenia_owner で接続する（db/init/01-owner.sh が作る）。
+# pgvector の有効化だけは init でスーパーユーザーが行う（Neon ではコンソール/SQL で有効化）。
+#
+# パスワードはこのファイルに書かない。`npm run db:up`（worker/）が リポジトリ直下の
+# .env（gitignore 済み）にランダム生成し、compose がそれを読む。ポートは 127.0.0.1 にのみ公開する。
+# （55432 = nonomono-shop、55433 = personal-rag と被らないように 55435。
+#   544xx 台は Windows の予約範囲に入っていて bind できないことがある）
+name: pollenia
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: pollenia_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run "npm run db:up" in worker/ (.env が生成される)}
+      POLLENIA_OWNER_PASSWORD: ${POLLENIA_OWNER_PASSWORD:?run "npm run db:up" in worker/}
+    ports:
+      - "127.0.0.1:55435:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pollenia"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

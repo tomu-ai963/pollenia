@@ -17,6 +17,7 @@
 //   RATE_LIMITED       429  レート制限（AI 呼び出しの連投等）
 //   AI_REFUSED         422  AI が安全性の判定で応答を拒否（stop_reason: refusal。分類はログのみ）
 //   INTERNAL_ERROR     500  想定外 / DB エラー（詳細はログのみ）
+//   SERVICE_UNAVAILABLE 503 設定不足（ログインのシークレット・メール送信など。詳細はログのみ）
 import { json } from './http';
 
 export type ErrorCode =
@@ -29,7 +30,8 @@ export type ErrorCode =
   | 'PAYMENT_REQUIRED'
   | 'RATE_LIMITED'
   | 'AI_REFUSED'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'SERVICE_UNAVAILABLE';
 
 interface ErrorSpec {
   status: number;
@@ -51,6 +53,7 @@ const ERROR_TABLE: Record<ErrorCode, ErrorSpec> = {
     message: 'この内容には AI が回答できませんでした。表現を変えて再度お試しください。',
   },
   INTERNAL_ERROR: { status: 500, message: 'サーバー内部でエラーが発生しました。' },
+  SERVICE_UNAVAILABLE: { status: 503, message: 'ただいまご利用いただけません。時間をおいて再度お試しください。' },
 };
 
 export interface ErrorOptions {

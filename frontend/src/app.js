@@ -1,16 +1,12 @@
 // Pollenia アプリ本体（Phase 1: 記録・系統樹）。
-// 認証は supabase-js（Auth のみ使用。DB は Worker API 経由 — フロントから直接読まない）。
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { CONFIG } from './config.js';
-import { api, ApiError } from './api.js';
+// 認証は同じオリジンの Worker（workers-auth deviceAuth。Cookie）。DB は Worker API 経由。
+import { api, auth, ApiError } from './api.js';
 import { renderAncestors, renderDescendants } from './lineage-render.js';
 import { initCommunity, openMyProfile, loadCrossingOptions } from './community.js';
 import { initAi, resetListingUi } from './ai.js';
 
-const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
 
-let session = null;
 let plants = [];
 let me = null; // 自分の profile（subscription_status を含む）
 
@@ -18,10 +14,6 @@ let me = null; // 自分の profile（subscription_status を含む）
 const ENTITLED = new Set(['active', 'past_due']);
 function isSubscribed() {
   return ENTITLED.has(me?.subscription_status);
-}
-
-function token() {
-  return session?.access_token ?? null;
 }
 
 function show(id, visible) {
@@ -83,7 +75,7 @@ $('btn-subscribe').onclick = async () => {
   setError('plan-error', null);
   $('btn-subscribe').disabled = true;
   try {
-    const { url } = await api.createCheckout(token());
+    const { url } = await api.createCheckout();
     // Stripe Checkout へリダイレクト（成功/中断で success_url/cancel_url に戻る）。
     window.location.href = url;
   } catch (e) {
@@ -96,7 +88,7 @@ $('btn-portal').onclick = async () => {
   setError('plan-error', null);
   $('btn-portal').disabled = true;
   try {
-    const { url } = await api.createPortal(token());
+    const { url } = await api.createPortal();
     // Stripe Customer Portal へリダイレクト（完了後 return_url でフロントに戻る）。
     window.location.href = url;
   } catch (e) {
@@ -123,70 +115,187 @@ function handleCheckoutReturn() {
 }
 
 // ---- 認証・登録 -----------------------------------------------------------
+// workers-auth deviceAuth（lib/auth.ts）。セッション・端末の Cookie は HttpOnly なので、
+// 「この端末は信頼済みか」は localStorage の目印で推測するだけ（外れていても PIN ログインが
+// email_verification_required を返すので、そのときメールの手順に戻す）。
+
+const TRUSTED_KEY = 'pollenia.trustedDevice';
+const AUTH_STEPS = ['email', 'code', 'pin-set', 'pin'];
+
+function storageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storageSet(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // プライベートモード等。目印が無くてもメールの手順でログインできる
+  }
+}
+
+function showAuthStep(step) {
+  for (const s of AUTH_STEPS) show(`auth-step-${s}`, s === step);
+  show('auth-card', true);
+  show('register-card', false);
+  show('app-area', false);
+  show('btn-signout', false);
+  $('who').textContent = '';
+}
+
+// SDK のエラーコード → 画面の文言（Worker の API エラーは ApiError.message をそのまま使う）。
+function authErrorMessage(e) {
+  if (!(e instanceof ApiError)) return String(e?.message ?? e);
+  switch (e.code) {
+    case 'invalid_code':
+      return 'コードが正しくないか、有効期限が切れています。';
+    case 'invalid_pin': {
+      const left = e.body?.attemptsRemaining;
+      return typeof left === 'number' ? `PIN が違います（あと ${left} 回）。` : 'PIN が違います。';
+    }
+    case 'invalid_pin_format':
+      return 'PIN は6桁の数字で入力してください。';
+    case 'weak_pin':
+      return 'その PIN は推測されやすいため使えません。別の数字にしてください。';
+    case 'rate_limited': {
+      const sec = e.body?.retryAfterSec;
+      return sec ? `試行回数が多すぎます。${Math.ceil(sec / 60)} 分ほどおいて再度お試しください。` : '試行回数が多すぎます。しばらくおいて再度お試しください。';
+    }
+    case 'invalid_request':
+      return '入力内容を確認してください。';
+    case 'email_verification_required':
+      return 'メールのコードでログインしてください。';
+    case 'unauthenticated':
+      return 'ログインの有効期限が切れました。もう一度ログインしてください。';
+    default:
+      return `${e.message}（${e.code}）`;
+  }
+}
+
+function setAuthError(e) {
+  $('auth-error').textContent = e ? authErrorMessage(e) : '';
+}
 
 async function refreshSession() {
-  const { data } = await supabase.auth.getSession();
-  session = data.session;
-  if (!session) {
-    show('auth-card', true);
-    show('app-area', false);
-    $('who').textContent = '';
-    return;
-  }
   try {
-    const { profile } = await api.me(token());
+    const { profile } = await api.me();
     me = profile;
     $('who').textContent = profile.display_name;
     show('auth-card', false);
     show('register-card', false);
     show('app-area', true);
+    show('btn-signout', true);
     switchTab('timeline');
-    initCommunity({ token, me: profile, switchTab });
-    initAi({ token, isSubscribed });
+    initCommunity({ me: profile, switchTab });
+    initAi({ isSubscribed });
     renderPlan();
     handleCheckoutReturn();
     await Promise.all([loadPlants(), loadCrossings()]);
   } catch (e) {
-    if (e instanceof ApiError && e.status === 403) {
-      // JWT は有効だが Pollenia 未登録 → 登録カードを出す
+    if (e instanceof ApiError && e.status === 401) {
+      // 未ログイン。信頼済みの目印がある端末は PIN から、それ以外はメールから
+      showAuthStep(storageGet(TRUSTED_KEY) ? 'pin' : 'email');
+    } else if (e instanceof ApiError && e.status === 403) {
+      // ログイン済みだが Pollenia 未登録 → 登録カードを出す
       show('auth-card', false);
       show('register-card', true);
       show('app-area', false);
+      show('btn-signout', true);
     } else {
-      setError('auth-error', e);
+      showAuthStep('email');
+      setAuthError(e);
     }
   }
 }
 
-$('btn-signup').onclick = async () => {
-  setError('auth-error', null);
-  const { error } = await supabase.auth.signUp({
-    email: $('auth-email').value,
-    password: $('auth-password').value,
+// ボタン連打で二重送信しない（コード送信は再送間隔の制限にかかる）
+async function withButton(id, fn) {
+  const btn = $(id);
+  btn.disabled = true;
+  setAuthError(null);
+  try {
+    await fn();
+  } catch (e) {
+    setAuthError(e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('btn-email-start').onclick = () =>
+  withButton('btn-email-start', async () => {
+    const email = $('auth-email').value.trim();
+    if (!email) throw new Error('メールアドレスを入力してください。');
+    await auth.emailStart(email);
+    $('auth-code-notice').textContent = `${email} にコードを送りました（10分間有効）。届かないときは迷惑メールも確認してください。`;
+    $('auth-code').value = '';
+    showAuthStep('code');
   });
-  if (error) return setError('auth-error', error);
-  await refreshSession();
+
+$('btn-email-verify').onclick = () =>
+  withButton('btn-email-verify', async () => {
+    const { pinSet } = await auth.emailVerify($('auth-email').value.trim(), $('auth-code').value.trim());
+    storageSet(TRUSTED_KEY, '1');
+    if (!pinSet) {
+      $('auth-pin-new').value = '';
+      $('auth-pin-confirm').value = '';
+      showAuthStep('pin-set');
+      return;
+    }
+    await refreshSession();
+  });
+
+$('btn-code-back').onclick = () => {
+  setAuthError(null);
+  showAuthStep('email');
 };
 
-$('btn-signin').onclick = async () => {
-  setError('auth-error', null);
-  const { error } = await supabase.auth.signInWithPassword({
-    email: $('auth-email').value,
-    password: $('auth-password').value,
+$('btn-pin-set').onclick = () =>
+  withButton('btn-pin-set', async () => {
+    const pin = $('auth-pin-new').value;
+    if (pin !== $('auth-pin-confirm').value) throw new Error('確認用の PIN が一致しません。');
+    await auth.setPin(pin);
+    await refreshSession();
   });
-  if (error) return setError('auth-error', error);
-  await refreshSession();
+
+$('btn-pin-login').onclick = () =>
+  withButton('btn-pin-login', async () => {
+    try {
+      await auth.pinLogin($('auth-pin').value);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'email_verification_required') {
+        // 端末が未登録・失効、または PIN を3回間違えてロック → メールからやり直し
+        storageSet(TRUSTED_KEY, null);
+        showAuthStep('email');
+      }
+      throw e;
+    } finally {
+      $('auth-pin').value = '';
+    }
+    await refreshSession();
+  });
+
+$('btn-pin-use-email').onclick = () => {
+  setAuthError(null);
+  showAuthStep('email');
 };
 
 $('btn-signout').onclick = async () => {
-  await supabase.auth.signOut();
+  // セッションだけ終わらせる（この端末は信頼済みのまま。次回は PIN で入れる）
+  await auth.logout().catch(() => {});
+  me = null;
   await refreshSession();
 };
 
 $('btn-register').onclick = async () => {
   setError('register-error', null);
   try {
-    await api.register(token(), $('register-name').value);
+    await api.register($('register-name').value);
     await refreshSession();
   } catch (e) {
     setError('register-error', e);
@@ -196,7 +305,7 @@ $('btn-register').onclick = async () => {
 // ---- 個体 -----------------------------------------------------------------
 
 async function loadPlants() {
-  ({ plants } = await api.listPlants(token()));
+  ({ plants } = await api.listPlants());
   const list = $('plant-list');
   list.replaceChildren();
   for (const p of plants) {
@@ -235,7 +344,7 @@ async function loadPlants() {
       share.className = 'small ghost';
       share.textContent = '公開URL';
       share.onclick = () => {
-        const url = new URL('public.html', location.href);
+        const url = new URL('/public', location.origin);
         url.searchParams.set('id', p.id);
         navigator.clipboard?.writeText(url.toString());
         alert(`公開URLをコピーしました:\n${url}`);
@@ -247,7 +356,7 @@ async function loadPlants() {
     del.textContent = '削除';
     del.onclick = async () => {
       if (!confirm(`「${p.name}」を削除しますか？（記録は残ります）`)) return;
-      await api.deletePlant(token(), p.id);
+      await api.deletePlant(p.id);
       await loadPlants();
     };
     btns.appendChild(del);
@@ -305,7 +414,7 @@ $('btn-save-plant').onclick = async () => {
   const name = $('edit-plant-name').value.trim();
   if (!name) return setError('plant-edit-error', new Error('名前は必須です。'));
   try {
-    await api.updatePlant(token(), editingPlantId, {
+    await api.updatePlant(editingPlantId, {
       name,
       species: $('edit-plant-species').value.trim() || null,
       visibility: $('edit-plant-visibility').value,
@@ -371,7 +480,7 @@ $('btn-create-plant').onclick = async () => {
     if ($('plant-notes').value.trim()) body.notes = $('plant-notes').value;
     const traits = collectTraits('plant-');
     if (Object.keys(traits).length) body.traits = traits;
-    await api.createPlant(token(), body);
+    await api.createPlant(body);
     resetPlantForm();
     await loadPlants();
   } catch (e) {
@@ -403,7 +512,7 @@ async function openDetail(plantId) {
   reveal($('detail-card'));
   setError('detail-error', null);
   try {
-    const { plant, photos } = await api.getPlant(token(), plantId);
+    const { plant, photos } = await api.getPlant(plantId);
     $('detail-title').textContent = `${plant.name}${plant.species ? `（${plant.species}）` : ''}`;
     $('detail-card').dataset.plantId = plant.id;
     resetListingUi(); // 前に開いた個体の出品文を残さない
@@ -427,7 +536,7 @@ async function openDetail(plantId) {
 }
 
 async function loadLineage(plantId, direction) {
-  const data = await api.lineage(token(), plantId, direction);
+  const data = await api.lineage(plantId, direction);
   const container = $('lineage-tree');
   if (direction === 'up') renderAncestors(container, plantId, data);
   else renderDescendants(container, plantId, data);
@@ -442,15 +551,12 @@ $('btn-upload-photo').onclick = async () => {
   const file = $('photo-file').files[0];
   if (!file) return setError('detail-error', new Error('ファイルを選択してください。'));
   try {
-    const { upload } = await api.createPhoto(token(), plantId, {
+    const { upload } = await api.createPhoto(plantId, {
       content_type: file.type,
       caption: $('photo-caption').value.trim() || undefined,
     });
-    // Worker が発行した署名URLへ直接アップロード（Storage の認可は署名トークンが担う）
-    const { error } = await supabase.storage
-      .from('pollenia-photos')
-      .uploadToSignedUrl(upload.path, upload.token, file);
-    if (error) throw error;
+    // Worker が返したアップロード先（PUT /api/photos/:id）へ本体を送る（R2 への保存は Worker が行う）
+    await api.uploadPhoto(upload, file);
     await openDetail(plantId);
   } catch (e) {
     setError('detail-error', e);
@@ -460,7 +566,7 @@ $('btn-upload-photo').onclick = async () => {
 // ---- 交配・採種・播種 --------------------------------------------------------
 
 async function loadCrossings() {
-  const { crossings } = await api.listCrossings(token());
+  const { crossings } = await api.listCrossings();
   const list = $('crossing-list');
   list.replaceChildren();
   for (const c of crossings) {
@@ -500,7 +606,7 @@ async function loadCrossings() {
     addHarvest.onclick = async () => {
       const seedCount = prompt('採種数（粒）:');
       if (seedCount === null) return;
-      await api.createHarvest(token(), c.id, {
+      await api.createHarvest(c.id, {
         harvest_date: new Date().toISOString().slice(0, 10),
         seed_count: Number(seedCount) || 0,
       });
@@ -515,7 +621,7 @@ async function loadCrossings() {
         const count = prompt('播種数（粒）:');
         if (count === null) return;
         const latest = c.harvests[c.harvests.length - 1];
-        await api.createSowing(token(), latest.id, {
+        await api.createSowing(latest.id, {
           sowing_date: new Date().toISOString().slice(0, 10),
           sowing_count: Number(count) || 0,
         });
@@ -537,7 +643,7 @@ async function loadCrossings() {
         : '';
       if (!confirm(`交配記録「${label}」を削除しますか？この操作は取り消せません。${warn}`)) return;
       try {
-        await api.deleteCrossing(token(), c.id);
+        await api.deleteCrossing(c.id);
         await Promise.all([loadCrossings(), loadCrossingOptions()]);
       } catch (e) {
         setError('crossing-error', e);
@@ -571,7 +677,7 @@ $('btn-create-crossing').onclick = async () => {
     else if ($('cross-pollen').value) body.pollen_parent_id = $('cross-pollen').value;
     if ($('cross-date').value) body.cross_date = $('cross-date').value;
     if ($('cross-notes').value.trim()) body.notes = $('cross-notes').value;
-    await api.createCrossing(token(), body);
+    await api.createCrossing(body);
     $('cross-self').checked = false;
     applySelfState('cross');
     $('cross-notes').value = '';
@@ -608,7 +714,7 @@ $('btn-save-crossing').onclick = async () => {
   if (!editingCrossingId) return;
   try {
     const seed = $('edit-cross-seed').value;
-    await api.updateCrossing(token(), editingCrossingId, {
+    await api.updateCrossing(editingCrossingId, {
       seed_parent_id: seed,
       pollen_parent_id: $('edit-cross-self').checked
         ? seed

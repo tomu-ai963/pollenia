@@ -20,9 +20,9 @@ import { STRIPE_WEBHOOK_TOLERANCE_SECONDS } from '../constants';
 
 // ローカル検証用のフォールバック（本番は STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL /
 // STRIPE_PORTAL_RETURN_URL を設定）。
-const DEFAULT_SUCCESS_URL = 'http://127.0.0.1:8788/?checkout=success';
-const DEFAULT_CANCEL_URL = 'http://127.0.0.1:8788/?checkout=cancel';
-const DEFAULT_PORTAL_RETURN_URL = 'http://127.0.0.1:8788/';
+const DEFAULT_SUCCESS_URL = 'http://localhost:8787/?checkout=success';
+const DEFAULT_CANCEL_URL = 'http://localhost:8787/?checkout=cancel';
+const DEFAULT_PORTAL_RETURN_URL = 'http://localhost:8787/';
 
 // POST /api/billing/checkout — Stripe Checkout Session（subscription モード）を作成。
 // Request : ボディ不要。Response: { url }（フロントはこの URL へリダイレクト）。

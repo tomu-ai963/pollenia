@@ -1,16 +1,11 @@
-// JSON / CORS レスポンスの薄いヘルパー（knowledge-rag の lib/http.ts を踏襲）。
+// JSON レスポンスの薄いヘルパー（knowledge-rag の lib/http.ts を踏襲）。
+//
+// 画面（frontend/ の静的配信）と API は同じ Worker・同じオリジンなので CORS ヘッダは付けない
+// （旧構成の Pages + workers.dev の cross-site 用 `access-control-allow-origin: *` は廃止）。
+// 認証は Cookie（workers-auth）。他オリジンのページからの読み取りはブラウザの同一オリジン
+// ポリシーで止まり、状態を変えるリクエストは SDK の Origin + CSRF 二重送信検査で止まる。
 
-// cross-site 構成（frontend は Cloudflare Pages、API は Workers の別オリジン）のため
-// CORS を許可する。MVP ではオリジンを限定しない（本番で絞る前提）。
-// 認証は Authorization: Bearer ヘッダで行うため、Allow-Headers に authorization を含める。
-export const CORS_HEADERS: Record<string, string> = {
-  'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'access-control-allow-headers': 'authorization, content-type',
-  'access-control-max-age': '86400',
-};
-
-// JSON レスポンス（CORS ヘッダ込み）。公開ページの Cache-Control 等は extraHeaders で足す。
+// JSON レスポンス。公開ページの Cache-Control 等は extraHeaders で足す。
 export function json(
   body: unknown,
   status = 200,
@@ -20,13 +15,7 @@ export function json(
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      ...CORS_HEADERS,
       ...extraHeaders,
     },
   });
-}
-
-// プリフライト(OPTIONS)応答。本文なし・204。
-export function preflight(): Response {
-  return new Response(null, { status: 204, headers: CORS_HEADERS });
 }

@@ -1,0 +1,8 @@
+# Workers Static Assets のレスポンスヘッダ（frontend/ 配下の静的ファイルにだけ効く。API は Worker 側で付ける）。
+# スクリプトは同一オリジンのファイルだけ（インライン script なし・外部 CDN なし）。
+# style の 'unsafe-inline' は index.html の style 属性のため。Google Fonts は styles.css の @import。
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

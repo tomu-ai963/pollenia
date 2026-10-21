@@ -1,5 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Sql } from '../lib/db';
+import type { PhotoSigner } from '../lib/photos';
 import { json } from '../lib/http';
 import { errorResponse } from '../lib/error-response';
 import { canView, type Visibility } from '../lib/visibility';
@@ -16,7 +16,7 @@ import { listPhotosWithUrls } from './plants';
 // - Cache-Control は短め（visibility を private に戻した際の伝播遅延の許容値）。
 export async function handlePublicPlant(
   sql: Sql,
-  supabase: SupabaseClient,
+  signPhotos: PhotoSigner,
   plantId: string,
 ): Promise<Response> {
   if (!isUuid(plantId)) return errorResponse('NOT_FOUND');
@@ -37,9 +37,9 @@ export async function handlePublicPlant(
   }
 
   const [photos, ancestors, descendants] = await Promise.all([
-    listPhotosWithUrls(sql, supabase, plantId),
-    buildLineage(sql, supabase, 'up', plantId, null, PUBLIC_LINEAGE_DEPTH),
-    buildLineage(sql, supabase, 'down', plantId, null, PUBLIC_LINEAGE_DEPTH),
+    listPhotosWithUrls(sql, signPhotos, plantId),
+    buildLineage(sql, signPhotos, 'up', plantId, null, PUBLIC_LINEAGE_DEPTH),
+    buildLineage(sql, signPhotos, 'down', plantId, null, PUBLIC_LINEAGE_DEPTH),
   ]);
 
   return json(

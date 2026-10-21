@@ -1,25 +1,16 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Sql } from '../lib/db';
 import { json } from '../lib/http';
 import { errorResponse } from '../lib/error-response';
-import { authenticateJwt, type AuthedUser } from '../lib/auth';
+import type { AuthedUser } from '../lib/auth';
 import { asText } from '../lib/validate';
 import { MAX_NAME_LEN, MAX_TEXT_LEN } from '../constants';
 
 // POST /api/profiles — Pollenia への初回登録（profiles 行の作成）。
-// 「有効な JWT ≠ Pollenia ユーザー」（README「掟」5）の登録側の入口。
-// JWT 検証のみ（authenticateJwt）で受け、profiles 行を自分の uid で作る。
+// 「有効なセッション ≠ Pollenia ユーザー」（lib/auth.ts）の登録側の入口。
+// セッションの検証のみ（index.ts）で受け、profiles 行をセッションの uid（pollenia.users.id）で作る。
 // 既に登録済みなら既存行を 200 で返す（冪等）。
 // Request: { display_name: string, bio?: string }
-export async function handleCreateProfile(
-  req: Request,
-  supabase: SupabaseClient,
-  sql: Sql,
-): Promise<Response> {
-  const auth = await authenticateJwt(req, supabase);
-  if (!auth.ok) return auth.response;
-  const uid = auth.value.uid;
-
+export async function handleCreateProfile(req: Request, sql: Sql, uid: string): Promise<Response> {
   const body = (await req.json().catch(() => null)) as
     | { display_name?: unknown; bio?: unknown }
     | null;

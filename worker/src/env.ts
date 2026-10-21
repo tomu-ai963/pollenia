@@ -1,20 +1,38 @@
 // Worker に注入される環境変数（ローカルは .dev.vars、本番は wrangler secret）。
 // コードに値を直書きしないこと。
 export interface Env {
-  // Auth の JWT 検証（auth.getUser）と Storage の署名URL発行にのみ使う。
-  SUPABASE_URL: string;
-  SUPABASE_SERVICE_ROLE_KEY: string;
-  // pollenia スキーマへの全 DB アクセス（テーブル・RPC）は postgres.js で行う。
-  // supabase-js の db アクセスは PostgREST 経由であり、pollenia を Exposed schemas に
-  // 追加しない方針（README「掟」6）と両立しないため使わない。
+  // DB（Neon）への全アクセスは postgres.js で行う（認証テーブル auth_* も同じ接続）。
   //
   // 接続先の解決順（lib/db.ts）:
   //   1. HYPERDRIVE.connectionString — 本番の正規経路（wrangler.toml のバインディング）。
-  //      ローカルの wrangler dev では localConnectionString がここに注入されるため同一コードパス。
-  //   2. DATABASE_URL — バインディングなしで動かすときのフォールバック
-  //      （単体テスト・Hyperdrive 設定が未作成の環境向け。.dev.vars で設定）。
+  //      ローカルの wrangler dev では localConnectionString（または
+  //      CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE）がここに注入される。
+  //      workers-auth の pg ストアの要件で、Hyperdrive はクエリキャッシュ無効（--caching-disabled）で作る。
+  //   2. DATABASE_URL — バインディングなしで動かすときのフォールバック。
   HYPERDRIVE?: Hyperdrive;
   DATABASE_URL?: string;
+
+  // --- 静的フロント（frontend/）。wrangler.toml の [assets] ---
+  ASSETS?: Fetcher;
+
+  // --- 写真（R2。キーは Worker が採番。閲覧は lib/photos.ts の署名付き URL） ---
+  PHOTOS: R2Bucket;
+
+  // --- ログイン（workers-auth deviceAuth: メールコード → 信頼済み端末 + PIN） ---
+  // 32 文字以上・十分なエントロピー（SDK が構築時に検査する）。写真 URL の署名鍵もここから
+  // HKDF で派生させる（lib/photos.ts）。生成: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+  DEVICE_AUTH_SECRET?: string;
+  // ローテーション中の旧シークレット（カンマ区切り）。新しい値に切り替えた後もしばらく残す。
+  DEVICE_AUTH_PREVIOUS_SECRETS?: string;
+  // メール送信（Resend）。送信元は tomu-ai.dev のアドレス（例: "Pollenia <noreply@tomu-ai.dev>"）。
+  RESEND_API_KEY?: string;
+  MAIL_FROM?: string;
+  // ローカル専用。"1" でログインコードを Worker のログに出す。リクエストのホストが
+  // localhost / 127.0.0.1 のときしか効かない（本番に紛れ込んでもコードはログに出ない）。
+  MOCK_MAIL?: string;
+  // PIN の PBKDF2 反復回数（1,000〜100,000。既定 100,000）。テスト・ローカルで下げる用。
+  PIN_PBKDF2_ITERATIONS?: string;
+
   // --- Phase 3: AI（育種相談・出品文生成） ---
   // Anthropic API の呼び出しは必ず Worker 経由（フロントにキーを渡さない）。
   // 未設定の環境では /api/ai/* が 500（詳細はログのみ）になる。

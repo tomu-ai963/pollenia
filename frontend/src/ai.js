@@ -9,7 +9,6 @@ const $ = (id) => document.getElementById(id);
 // Worker 側 AI_HISTORY_MAX_TURNS と揃える。
 const HISTORY_MAX = 12;
 
-let tokenFn = null;
 let subscribedFn = () => true; // 加入状態を返す（app.js から注入）
 let history = []; // {role: 'user'|'assistant', content: string}
 let sending = false;
@@ -63,7 +62,7 @@ async function sendConsult() {
 
   try {
     // 送る履歴は「今回の message を含まない」直近ターン（Worker と同じ契約）。
-    const { answer } = await api.aiConsult(tokenFn(), message, history.slice(-HISTORY_MAX));
+    const { answer } = await api.aiConsult(message, history.slice(-HISTORY_MAX));
     pending.querySelector('.body').textContent = answer || '（回答を生成できませんでした）';
     history.push({ role: 'user', content: message });
     history.push({ role: 'assistant', content: answer || '' });
@@ -93,7 +92,7 @@ async function generateListing() {
   btn.disabled = true;
   btn.textContent = '生成中…';
   try {
-    const { listing } = await api.aiListing(tokenFn(), plantId, $('listing-marketplace').value);
+    const { listing } = await api.aiListing(plantId, $('listing-marketplace').value);
     $('listing-title').value = listing.title;
     $('listing-body').value = listing.body;
     $('listing-result').classList.remove('hidden');
@@ -111,8 +110,7 @@ function copyToClipboard(text, label) {
   });
 }
 
-export function initAi({ token, isSubscribed }) {
-  tokenFn = token;
+export function initAi({ isSubscribed }) {
   if (typeof isSubscribed === 'function') subscribedFn = isSubscribed;
 
   $('btn-ai-send').onclick = sendConsult;
