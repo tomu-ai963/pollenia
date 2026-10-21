@@ -1,8 +1,9 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Sql } from '../lib/db';
 import { json } from '../lib/http';
 import { errorResponse } from '../lib/error-response';
 import type { AuthedUser } from '../lib/auth';
+import type { Env } from '../env';
+import type { PhotoSigner } from '../lib/photos';
 import { canViewWithDb, type Visibility } from '../lib/visibility';
 import { asDateStr, asText, asVisibility, clampIntParam, isUuid } from '../lib/validate';
 import { parsePlantTraits } from '../lib/traits';
@@ -11,9 +12,8 @@ import {
   LIST_LIMIT_MAX,
   MAX_NAME_LEN,
   MAX_TEXT_LEN,
-  PHOTO_BUCKET,
   PHOTO_CONTENT_TYPES,
-  PHOTO_SIGNED_URL_SECONDS,
+  PHOTO_MAX_BYTES,
 } from '../constants';
 
 // 個体（plants）の CRUD。書き込みは常に所有者のみ。
@@ -91,7 +91,7 @@ export async function handleCreatePlant(
 // 不可視は 404（存在を秘匿。403 と使い分けない）。
 export async function handleGetPlant(
   sql: Sql,
-  supabase: SupabaseClient,
+  signPhotos: PhotoSigner,
   user: AuthedUser,
   plantId: string,
 ): Promise<Response> {
@@ -114,7 +114,7 @@ export async function handleGetPlant(
     if (!visible) return errorResponse('NOT_FOUND');
   }
 
-  const photos = await listPhotosWithUrls(sql, supabase, plantId);
+  const photos = await listPhotosWithUrls(sql, signPhotos, plantId);
 
   if (isOwner) return json({ plant, photos });
   // 他人向けサブセット（notes・origin_sowing_id 等の記録詳細は所有者のみ）。
@@ -209,15 +209,14 @@ export async function handleDeletePlant(
   return json({ ok: true, id: rows[0].id });
 }
 
-// POST /api/plants/:id/photos — Storage への署名付きアップロードURL発行 + plant_photos 行作成。
+// POST /api/plants/:id/photos — plant_photos 行作成 + アップロード先（PUT /api/photos/:id）の返却。
 // Request: { content_type: 'image/jpeg'|'image/png'|'image/webp', caption?, taken_at? }
-// Response: { photo: {...}, upload: { path, token } }
-//   クライアントは supabase-js の storage.from(bucket).uploadToSignedUrl(path, token, file) で
-//   アップロードする。行を先に作るため、アップロード失敗時は写真なしの行が残る（MVP 許容）。
+// Response: { photo: {...}, upload: { url, method: 'PUT', content_type } }
+//   クライアントは upload.url に画像本体を PUT する（セッション必須・同じ content_type）。
+//   行を先に作るため、アップロード失敗時は uploaded_at が null の行が残る（一覧には出ない。MVP 許容）。
 export async function handleCreatePhoto(
   req: Request,
   sql: Sql,
-  supabase: SupabaseClient,
   user: AuthedUser,
   plantId: string,
 ): Promise<Response> {
@@ -248,39 +247,103 @@ export async function handleCreatePhoto(
   // パスは Worker が採番する（クライアント指定のパスを信用しない）。
   const storagePath = `${user.uid}/${plantId}/${crypto.randomUUID()}.${ext}`;
 
-  const { data: signed, error: signErr } = await supabase.storage
-    .from(PHOTO_BUCKET)
-    .createSignedUploadUrl(storagePath);
-  if (signErr || !signed) {
-    return errorResponse('INTERNAL_ERROR', { detail: signErr ?? 'createSignedUploadUrl failed' });
-  }
-
   const rows = await sql`
     insert into pollenia.plant_photos (plant_id, user_id, storage_path, caption, taken_at)
     values (${plantId}::uuid, ${user.uid}::uuid, ${storagePath}, ${caption}, ${takenAt})
     returning id, plant_id, storage_path, caption, taken_at, created_at
   `;
-  return json({ photo: rows[0], upload: { path: signed.path, token: signed.token } }, 201);
+  const photo = rows[0];
+  return json(
+    {
+      photo,
+      upload: { url: `/api/photos/${photo.id}`, method: 'PUT', content_type: contentType },
+    },
+    201,
+  );
 }
 
-// 写真一覧に閲覧用の署名URLを添えて返す（storage_path は保存のみ、URL は都度発行）。
+// PUT /api/photos/:id — 画像本体を R2 に置く（1 行につき 1 回だけ）。
+//   * 自分の行・未アップロード・個体が未削除のときだけ受け付ける（それ以外は 404）
+//   * Content-Type は行の拡張子から決まる値と一致すること（R2 にはその値を保存し、配信時もそれだけを使う）
+//   * 本文は PHOTO_MAX_BYTES まで（Content-Length と実際の長さの両方で確かめる）
+// uploaded_at の更新は「null のときだけ」の条件付き UPDATE で行い、同時 PUT でも 1 回に絞る
+// （R2 への put は条件付き UPDATE の後。失敗したら uploaded_at を戻して再試行できるようにする）。
+export async function handleUploadPhoto(
+  req: Request,
+  env: Env,
+  sql: Sql,
+  user: AuthedUser,
+  photoId: string,
+): Promise<Response> {
+  if (!isUuid(photoId)) return errorResponse('NOT_FOUND');
+
+  const declared = Number(req.headers.get('content-length') ?? NaN);
+  if (Number.isFinite(declared) && declared > PHOTO_MAX_BYTES) {
+    return errorResponse('VALIDATION_ERROR', {
+      publicMessage: `画像は ${PHOTO_MAX_BYTES / 1024 / 1024}MB までです。`,
+    });
+  }
+
+  const claimed = await sql`
+    update pollenia.plant_photos ph
+    set uploaded_at = now()
+    from pollenia.plants p
+    where ph.id = ${photoId}::uuid
+      and ph.user_id = ${user.uid}::uuid
+      and ph.uploaded_at is null
+      and p.id = ph.plant_id and p.deleted_at is null
+    returning ph.storage_path
+  `;
+  if (claimed.length === 0) return errorResponse('NOT_FOUND');
+  const storagePath = claimed[0].storage_path as string;
+
+  const release = () => sql`
+    update pollenia.plant_photos set uploaded_at = null where id = ${photoId}::uuid
+  `;
+
+  const ext = storagePath.slice(storagePath.lastIndexOf('.') + 1);
+  const expectedType = Object.entries(PHOTO_CONTENT_TYPES).find(([, e]) => e === ext)?.[0];
+  const sentType = (req.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+  if (!expectedType || sentType !== expectedType) {
+    await release();
+    return errorResponse('VALIDATION_ERROR', {
+      publicMessage: `Content-Type は ${expectedType ?? '登録時の形式'} で送ってください。`,
+    });
+  }
+
+  const body = await req.arrayBuffer();
+  if (body.byteLength === 0 || body.byteLength > PHOTO_MAX_BYTES) {
+    await release();
+    return errorResponse('VALIDATION_ERROR', {
+      publicMessage: `画像は 1 バイト以上 ${PHOTO_MAX_BYTES / 1024 / 1024}MB までです。`,
+    });
+  }
+
+  try {
+    await env.PHOTOS.put(storagePath, body, { httpMetadata: { contentType: expectedType } });
+  } catch (e) {
+    await release();
+    throw e;
+  }
+  return json({ ok: true, id: photoId });
+}
+
+// 写真一覧（アップロード済みのみ）に閲覧用の署名URLを添えて返す（storage_path は保存のみ、URL は都度発行）。
+// 呼び出し側が個体の可視性判定を済ませてから呼ぶこと。
 export async function listPhotosWithUrls(
   sql: Sql,
-  supabase: SupabaseClient,
+  signPhotos: PhotoSigner,
   plantId: string,
 ): Promise<unknown[]> {
   const photos = await sql`
     select id, plant_id, storage_path, caption, taken_at, created_at
     from pollenia.plant_photos
-    where plant_id = ${plantId}::uuid
+    where plant_id = ${plantId}::uuid and uploaded_at is not null
     order by created_at desc
   `;
   if (photos.length === 0) return [];
 
-  const { data: signed } = await supabase.storage
-    .from(PHOTO_BUCKET)
-    .createSignedUrls(photos.map((p) => p.storage_path), PHOTO_SIGNED_URL_SECONDS);
-  const urlByPath = new Map((signed ?? []).map((s) => [s.path, s.signedUrl]));
+  const urlByPath = await signPhotos(photos.map((p) => p.storage_path));
   return photos.map((p) => ({ ...p, url: urlByPath.get(p.storage_path) ?? null }));
 }
 

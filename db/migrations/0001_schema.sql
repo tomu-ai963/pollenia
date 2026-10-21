@@ -152,6 +152,9 @@ create table pollenia.plant_photos (
   storage_path text not null,  -- R2 のオブジェクトキー。閲覧 URL は Worker が都度署名するため保存しない
   caption      text,
   taken_at     date,
+  -- R2 への PUT が終わった時刻。行は先に作るので、未アップロード（null）の行は一覧に出さず、
+  -- 2回目以降の PUT も受け付けない（PUT /api/photos/:id）
+  uploaded_at  timestamptz,
   created_at   timestamptz not null default now()
 );
 

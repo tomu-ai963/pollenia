@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Pollenia API (Cloudflare Workers) — 植物の交配・育種記録と系統樹の Phase 1 実装",
   "scripts": {
-    "dev": "wrangler dev --local",
+    "dev": "node scripts/dev.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:up": "node scripts/setup-local.mjs && docker compose -f ../docker-compose.yml --env-file ../.env up -d --wait",
@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
-    "@supabase/supabase-js": "^2.45.4",
     "@tomu-ai/workers-auth": "github:tomu-ai963/workers-auth#v0.3.1",
     "hono": "^4.13.13",
     "postgres": "^3.4.5"

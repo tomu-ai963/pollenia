@@ -17,9 +17,10 @@ export const PUBLIC_CACHE_SECONDS = 60;
 export const LIST_LIMIT_DEFAULT = 50;
 export const LIST_LIMIT_MAX = 100;
 
-// Storage。バケットは pollenia- prefix 必須（README「掟」3）。
-export const PHOTO_BUCKET = 'pollenia-photos';
+// 写真（R2。バインディング PHOTOS）。閲覧 URL は Worker が署名して都度発行する（lib/photos.ts）。
 export const PHOTO_SIGNED_URL_SECONDS = 3600;
+// アップロード 1 枚の上限（PUT /api/photos/:id の本文）。
+export const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 
 // 受け付ける画像の content-type → 拡張子。
 export const PHOTO_CONTENT_TYPES: Record<string, string> = {

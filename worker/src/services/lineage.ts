@@ -1,6 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { uuidArrayLiteral, type Sql } from '../lib/db';
-import { PHOTO_BUCKET, PHOTO_SIGNED_URL_SECONDS } from '../constants';
+import type { PhotoSigner } from '../lib/photos';
 
 // 系統樹の取得と組み立て。
 // 可視性フィルタは RPC（pollenia.get_ancestors / get_descendants）側で完結しており、
@@ -70,7 +69,7 @@ export function collectVisiblePlantIds(entryId: string, edges: LineageEdge[]): s
 // soft delete 済みの個体も系統の整合のため含める（deleted フラグで区別）。
 export async function buildLineageNodes(
   sql: Sql,
-  supabase: SupabaseClient,
+  signPhotos: PhotoSigner,
   visibleIds: string[],
 ): Promise<Record<string, LineageNode>> {
   if (visibleIds.length === 0) return {};
@@ -83,19 +82,11 @@ export async function buildLineageNodes(
   const photos = await sql`
     select distinct on (plant_id) plant_id, storage_path
     from pollenia.plant_photos
-    where plant_id = any(${uuidArrayLiteral(visibleIds)}::uuid[])
+    where plant_id = any(${uuidArrayLiteral(visibleIds)}::uuid[]) and uploaded_at is not null
     order by plant_id, created_at desc
   `;
 
-  const urlByPath = new Map<string, string>();
-  if (photos.length > 0) {
-    const { data: signed } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .createSignedUrls(photos.map((p) => p.storage_path), PHOTO_SIGNED_URL_SECONDS);
-    for (const s of signed ?? []) {
-      if (s.signedUrl) urlByPath.set(s.path ?? '', s.signedUrl);
-    }
-  }
+  const urlByPath = await signPhotos(photos.map((p) => p.storage_path));
   const pathByPlant = new Map(photos.map((p) => [p.plant_id, p.storage_path]));
 
   const nodes: Record<string, LineageNode> = {};
@@ -115,13 +106,13 @@ export async function buildLineageNodes(
 // エッジ + ノード表を一括で組み立てる（lineage / public 共用）。
 export async function buildLineage(
   sql: Sql,
-  supabase: SupabaseClient,
+  signPhotos: PhotoSigner,
   direction: LineageDirection,
   entryId: string,
   viewerId: string | null,
   maxDepth: number,
 ): Promise<{ edges: LineageEdge[]; nodes: Record<string, LineageNode> }> {
   const edges = await fetchLineageEdges(sql, direction, entryId, viewerId, maxDepth);
-  const nodes = await buildLineageNodes(sql, supabase, collectVisiblePlantIds(entryId, edges));
+  const nodes = await buildLineageNodes(sql, signPhotos, collectVisiblePlantIds(entryId, edges));
   return { edges, nodes };
 }

@@ -8,12 +8,36 @@
  * .env が既にあるときは何もしない（DB ボリュームのパスワードと食い違わせないため）。
  */
 import { randomBytes } from 'node:crypto';
-import { existsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const envPath = join(root, '.env');
+const devVarsPath = join(root, 'worker', '.dev.vars');
+
+// worker/.dev.vars（wrangler dev 用）に、ローカルのログインに要るキーが無ければ追記する。
+// 既にあるキーは変えない。DEVICE_AUTH_SECRET は SDK の要件（32 文字以上・十分なエントロピー）を満たす長さで生成。
+function ensureDevVars() {
+  const current = existsSync(devVarsPath) ? readFileSync(devVarsPath, 'utf8') : '';
+  const present = new Set([...current.matchAll(/^([A-Z_]+)=/gm)].map((m) => m[1]));
+  const wanted = {
+    DEVICE_AUTH_SECRET: randomBytes(48).toString('base64url'),
+    MOCK_MAIL: '1',
+    PIN_PBKDF2_ITERATIONS: '1000',
+  };
+  const missing = Object.entries(wanted).filter(([key]) => !present.has(key));
+  if (missing.length === 0) {
+    console.log('keep    worker/.dev.vars');
+    return;
+  }
+  const lines = missing.map(([key, value]) => `${key}="${value}"`);
+  const sep = current === '' || current.endsWith('\n') ? '' : '\n';
+  appendFileSync(devVarsPath, `${sep}\n# npm run db:up（setup-local.mjs）が追記\n${lines.join('\n')}\n`);
+  console.log(`update  worker/.dev.vars（追記: ${missing.map(([key]) => key).join(', ')}）`);
+}
+
+ensureDevVars();
 
 if (existsSync(envPath)) {
   console.log('keep    .env');
