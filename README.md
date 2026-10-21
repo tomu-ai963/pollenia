@@ -7,112 +7,104 @@
 
 | レイヤ | 技術 |
 |---|---|
-| フロントエンド | Cloudflare Pages（静的） |
-| バックエンド | Cloudflare Workers |
-| DB | Supabase (PostgreSQL) — tomu-system プロジェクトの `pollenia` スキーマに間借り |
-| 認証 | Supabase Auth |
-| ストレージ | Supabase Storage（バケット名は `pollenia-` prefix 必須） |
+| 配信 | Cloudflare Workers（1つの Worker で画面 `frontend/` の静的配信と API を兼ねる） |
+| DB | Neon（PostgreSQL + pgvector）。Worker からは Hyperdrive 経由の postgres.js |
+| 認証 | `@tomu-ai/workers-auth` の deviceAuth（メールコード → 信頼済み端末 + PIN。Cookie） |
+| メール | Resend（送信元ドメイン tomu-ai.dev） |
+| ストレージ | Cloudflare R2（バケット `pollenia-photos`。閲覧は Worker が署名した URL） |
 | AI | Anthropic API（有料プランのみ） |
+| 課金 | Stripe（月額サブスク ¥300） |
+
+2026-10 に tomu-system の Supabase（`pollenia` スキーマの間借り・Supabase Auth・Storage）から
+切り出した。ユーザーがいなかったのでデータ移行はしていない。
 
 ## ディレクトリ構成
 
 ```
 pollenia/
 ├── README.md
-├── AGENTS.md            # エージェント向け作業規約（他プロジェクトと同様）
+├── AGENTS.md            # エージェント向け作業規約
+├── docker-compose.yml   # ローカル Postgres（pgvector:pg17、127.0.0.1:55435）
 ├── _docs/
-│   ├── product.md       # プロダクト仕様・プラン設計
 │   ├── datamodel.md     # ER設計と設計判断の記録
 │   └── api.md           # Worker API 仕様
-├── supabase/
-│   ├── config.toml
-│   └── migrations/      # 0001_init.sql 形式の連番（contract-review と同じ流儀）
+├── db/
+│   ├── init/            # ローカル DB の初期化（所有者ロール・pgvector）
+│   └── migrations/      # 0001_schema.sql 形式の連番（worker/scripts/migrate.mjs が適用）
 ├── worker/
-│   ├── wrangler.toml
+│   ├── wrangler.toml    # [assets]=../frontend、R2、Hyperdrive
 │   ├── package.json
-│   ├── tsconfig.json
 │   ├── .dev.vars.example
+│   ├── scripts/         # setup-local / migrate / dev
 │   ├── src/
-│   │   ├── index.ts     # ルーティングのみ
-│   │   ├── env.ts       # 環境変数の型と検証
+│   │   ├── index.ts     # Hono のルーティング（認証・DB 接続のミドルウェア）
+│   │   ├── env.ts       # 環境変数の型
 │   │   ├── constants.ts
-│   │   ├── lib/         # supabase.ts / auth.ts / http.ts / error-response.ts
+│   │   ├── lib/         # auth.ts / mail.ts / photos.ts / db.ts / http.ts / error-response.ts
 │   │   │   └── ai/      # Phase 3: embeddings / context / rag / anthropic / rate-limit
-│   │   │                #   （knowledge-rag の RAG 構成を流用。詳細は _docs/api.md）
-│   │   ├── routes/      # plants.ts / records.ts / lineage.ts / posts.ts / social.ts / ai.ts
+│   │   ├── routes/      # plants.ts / records.ts / lineage.ts / posts.ts / follows.ts / ai.ts / billing.ts
 │   │   └── services/    # lineage.ts
 │   └── test/
-└── frontend/            # Cloudflare Pages（他プロジェクトと同じ静的構成）
+└── frontend/            # 静的ファイル（ビルドなし）。Worker の [assets] として配信
+    ├── _headers         # CSP などのレスポンスヘッダ
     ├── index.html
+    ├── public.html      # 公開系統ページ（/public?id=...）
     └── src/
 ```
 
-## セットアップ
+## ローカル開発
+
+前提: Docker Desktop が起動していること（手動起動が要ることがある）。
 
 ```bash
-# マイグレーション適用（tomu-system プロジェクトに対して）
-# ※ supabase CLI の migration 履歴は tomu-system 本体と共有になるため、
-#    pollenia のマイグレーションは psql で直接適用し、このリポジトリで履歴管理する
-psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0001_init.sql
-psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0002_rls.sql
-psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0003_community.sql
-psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0004_plant_traits.sql
-psql "$TOMU_SYSTEM_DB_URL" -f supabase/migrations/0005_ai.sql   # pgvector を有効化する（AI機能）
-
-# Worker
 cd worker && npm install
-cp .dev.vars.example .dev.vars   # SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / ANTHROPIC_API_KEY を埋める
-npm run dev
-
-# Storage: private バケット `pollenia-photos` を作成しておく（写真アップロードに必要）
+npm run db:up        # .env（DB パスワード）と .dev.vars の不足キーを生成し、Postgres を起動
+npm run db:migrate   # db/migrations を適用（public.schema_migrations で管理）
+npm run dev          # http://localhost:8787（画面も API も同じ URL）
+npm run typecheck && npm test
 ```
 
-**Phase 1 では `pollenia` を PostgREST の Exposed schemas に追加しないこと。**
-露出すると deny-all RLS でも関数/ビュー経由でバイパスされうる（下記「掟」6 参照）。
-フロント直読みを解禁する Phase 2 で、テーブル/ビュー/関数ごとの明示 GRANT 設計とセットで露出する。
+- ログインコードは `MOCK_MAIL=1` で wrangler dev のログに出る（`localhost` / `127.0.0.1` からのリクエストのみ）
+- Cookie は `__Host-` + `Secure`。Chrome / Edge / Firefox は `http://localhost` でも受け取る
+- DB を作り直すときは `npm run db:reset`（ボリュームごと削除）→ `db:up` → `db:migrate`
+- 適用済みのマイグレーションは書き換えない（sha256 が変わると migrate.mjs が止まる）。変更は新しい番号で足す
 
-このため Worker からの `pollenia` スキーマへの DB アクセス（テーブル・RPC）は
-**postgres.js**で行う。supabase-js の DB アクセスは PostgREST 経由であり、
-非露出スキーマは service_role でも呼べない（service_role がバイパスするのは RLS で
-あってスキーマ露出ではない）ため使わない。supabase-js は Auth の JWT 検証
-（`auth.getUser`）と Storage の署名URL発行にのみ使う。
-
-接続経路は **Cloudflare Hyperdrive** バインディング（`worker/wrangler.toml`）:
+## 本番の構成と初回セットアップ（すべてとむの確認を取ってから実行）
 
 ```
-ローカル: wrangler dev が localConnectionString（supabase start の 54322）を
-          HYPERDRIVE.connectionString として注入（本番と同一コードパス）
-本番:     wrangler hyperdrive create で作成した設定（接続情報は Cloudflare 側にのみ保存。
-          origin は Supabase の Direct connection 推奨 — wrangler.toml のコメント参照）
-予備:     バインディングが無い環境は DATABASE_URL 直接続にフォールバック（lib/db.ts）
+1. Neon: プロジェクト pollenia を作成し、SQL Editor で `create extension if not exists vector;`
+2. マイグレーション: DATABASE_URL を環境変数で渡して `npm run db:migrate -- --allow-remote`
+3. Hyperdrive: `npx wrangler hyperdrive create pollenia-neon --caching-disabled --connection-string=...`
+   （Neon の直接接続 = -pooler なし）→ wrangler.toml の id を差し替え
+4. R2: `npx wrangler r2 bucket create pollenia-photos`
+5. secret: DEVICE_AUTH_SECRET / RESEND_API_KEY / MAIL_FROM / ANTHROPIC_API_KEY / OPENAI_API_KEY /
+   STRIPE_*（SUCCESS/CANCEL/PORTAL_RETURN の URL は https://pollenia.tomu-ai.dev 基準）
+6. deploy（worker/ で実行）→ Custom Domain `pollenia.tomu-ai.dev` を付与
+7. Stripe の Webhook URL を https://pollenia.tomu-ai.dev/api/billing/webhook に変更
+8. 旧構成の片付け: tomu-system の `pollenia` スキーマ・`pollenia_worker` ロール・`pollenia-` バケット、
+   旧 Hyperdrive 設定（pollenia-db）、Pages プロジェクト pollenia
 ```
 
-## 間借り運用の掟（将来の独立切り出しのため）
+## 運用の掟
 
-1. **`auth.users` への FK は `pollenia.profiles` の1箇所だけ**。業務テーブルは必ず profiles を参照する。
-2. **public スキーマのテーブル・関数・ENUM を一切参照しない**。すべて `pollenia.` 内で完結させる。
-3. **Storage バケットは `pollenia-` prefix**。tomu-system のバケットと混在させない。
-4. **マイグレーションはこのリポジトリで管理**し、tomu-system の migration 履歴に混ぜない。
-5. **有効な JWT ≠ Pollenia ユーザー**。tomu-system は Auth レルム（auth.users・JWT シークレット）を
-   全テナントで共有するため、B2B 側（contract-review 等）のために発行された JWT も同一プロジェクトなら
-   検証を通る。Worker は「Supabase JWT が有効」で認可せず、`pollenia.profiles` 行の存在（＋必要なら
-   アプリ固有クレーム）で判定すること。
-6. **`pollenia` を Phase 1 で PostgREST に露出しない**。露出＋grant があると、
-   deny-all RLS でも (a) ビューが `security_invoker` 未指定だと RLS バイパス、(b) 関数の
-   既定 PUBLIC EXECUTE 経由で anon が直接呼べる、の二経路で認可層（Worker）を迂回されうる。
-   マイグレーション側で `security_invoker=true`・PUBLIC からの `revoke execute` を施した上で、
-   露出は Phase 2 に GRANT 設計とともに先送りする。
-7. **公開系統ページ（匿名シェア URL）は `get_ancestors/get_descendants` を `p_viewer => NULL` で呼ぶ**。
-   これらの RPC は viewer から見えるノードだけを返し、非可視の親は ID を伏せて `has_hidden_parent`
+1. **Worker はスキーマ所有者ロールで接続し、認可は Worker が担う**。全テーブルは RLS 有効・ポリシー無し
+   （deny-all）で、所有者以外のロール（将来 Neon の Data API 等を有効化した場合の匿名・認証ロール）に
+   対する最終防衛線。ポリシーを足すときは Worker の認可と二重管理になる点に注意。
+2. **有効なセッション ≠ Pollenia ユーザー**。メールコードを通っただけで表示名を登録していない
+   `pollenia.users` 行がありうる。API は必ず `pollenia.profiles` 行の存在で判定する（`lib/auth.ts`）。
+3. **Pollenia のテーブル・関数・ENUM は `pollenia` スキーマ**。`public` には workers-auth の `auth_*` と
+   `schema_migrations` だけを置く。
+4. **関数の EXECUTE は PUBLIC から revoke**（definer 関数を所有者以外が直接呼べないように）。
+   ビュー `plant_parents` は `security_invoker = true` を維持する。
+5. **公開系統ページ（匿名シェア URL）は `get_ancestors/get_descendants` を `p_viewer => NULL` で呼ぶ**。
+   これらの関数は viewer から見えるノードだけを返し、非可視の親は ID を伏せて `has_hidden_parent`
    フラグのみ立てる。Worker は返却された可視 `plant_id` にだけ名前・写真を join すること
    （生の plant_id 全件を join すると非公開個体の名前・写真が漏れる）。
-8. 切り出し時の手順（想定）:
-   - `pg_dump --schema=pollenia` でスキーマごとダンプ → 新プロジェクトにリストア
-   - 切り出し先も Supabase 前提（`can_view`/`can_view_as` が `auth.uid()` に依存。`pg_dump --schema`
-     は `auth` スキーマを含めないため、`auth.uid()` が存在する環境へ復元する）
-   - Auth ユーザーは Admin API でエクスポート/インポート（UUID を維持すれば profiles との整合が保たれる）
-   - Storage は `pollenia-` バケットのオブジェクトをコピー
-   - Worker の接続先 URL / キーを差し替え
+6. **写真の閲覧 URL は可視性判定を通した後でだけ署名する**（`/photos/*` 自体は認証を要求しない）。
+   R2 のキーは Worker が採番し、Content-Type は許可リストから Worker が決める。
+7. **workers-auth の pg ストアの前提を崩さない**: 1リクエスト1接続、Hyperdrive は `--caching-disabled`、
+   読み取りレプリカに向けない。SDK を上げたら `db/migrations/0002_workers_auth.sql` を原本から作り直す
+   （`worker/test/migrations.test.ts` が検知する）。
 
 ## ロードマップ
 

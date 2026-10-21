@@ -1,5 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Sql } from '../lib/db';
+import type { PhotoSigner } from '../lib/photos';
 import { json } from '../lib/http';
 import { errorResponse } from '../lib/error-response';
 import type { AuthedUser } from '../lib/auth';
@@ -15,7 +15,7 @@ import { buildLineage, type LineageDirection } from '../services/lineage';
 export async function handleGetLineage(
   req: Request,
   sql: Sql,
-  supabase: SupabaseClient,
+  signPhotos: PhotoSigner,
   user: AuthedUser,
   plantId: string,
 ): Promise<Response> {
@@ -51,7 +51,7 @@ export async function handleGetLineage(
     }));
   if (!visible) return errorResponse('NOT_FOUND');
 
-  const { edges, nodes } = await buildLineage(sql, supabase, direction, plantId, user.uid, depth);
+  const { edges, nodes } = await buildLineage(sql, signPhotos, direction, plantId, user.uid, depth);
 
   return json({
     plant: { id: plant.id, name: plant.name, species: plant.species },

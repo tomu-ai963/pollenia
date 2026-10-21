@@ -1,10 +1,23 @@
--- Pollenia 初期スキーマ
--- tomu-system の Supabase プロジェクトに `pollenia` スキーマとして間借りする。
--- 将来の独立切り出しのため、auth.users への FK は profiles の1箇所に集約し、
--- それ以外のテーブルはすべて pollenia.profiles を参照する。
--- ENUM・関数・ビューもすべて pollenia スキーマ内に定義し、public には何も置かない。
+-- Pollenia スキーマ（Neon 専用 DB）
+--
+-- 旧構成（tomu-system の Supabase に `pollenia` スキーマとして間借り）の
+-- supabase/migrations 0001〜0006 を、Neon への切り出し（2026-10）で1本に統合したもの。
+-- ユーザーがまだいないためデータ移行はせず、作り直している。旧構成からの差分:
+--   * auth.users の代わりに pollenia.users（workers-auth deviceAuth の resolveUser が
+--     メールアドレスで find-or-create する）。profiles はその users を参照する。
+--   * service_role / authenticated / auth.uid() を使う箇所（関数の grant・can_view()）を削除。
+--     Worker はこのスキーマの所有者ロールで接続する（所有者は revoke 後も EXECUTE を持つ）。
+--   * RLS は deny-all のまま残す。所有者は RLS をバイパスするので Worker には効かず、
+--     所有者以外のロール（将来 Data API 等を有効化した場合の匿名・認証ロール）に対する
+--     最終防衛線として働く。
+--   * pgvector の有効化は所有者ロールではなく DB 作成時に行う（Neon はコンソール/SQL、
+--     ローカルは db/init/）。ここでは `if not exists` で確認だけする。
+--
+-- workers-auth の認証テーブル（auth_*）は 0002 で public スキーマに置く。
+-- Pollenia のテーブル・ENUM・関数・ビューはすべて pollenia スキーマに置く。
 
 create schema if not exists pollenia;
+create extension if not exists vector;
 
 create type pollenia.visibility as enum ('public', 'followers', 'private');
 
@@ -19,15 +32,46 @@ end;
 $$;
 
 -- ============================================================
--- profiles: auth.users との唯一の接点
+-- users: ログイン主体（メールアドレス）。workers-auth のセッションの user_id はこの id。
+-- 有効なセッション ≠ Pollenia ユーザー。Pollenia の利用登録は profiles 行の有無で判定する
+-- （メールコード認証を通っただけで、表示名を登録していない段階の users 行がありうる）。
+-- ============================================================
+create table pollenia.users (
+  id         uuid primary key default gen_random_uuid(),
+  -- deviceAuth の normalizeEmail（trim + 小文字化）済みの値だけが入る
+  email      text not null unique check (email = lower(btrim(email)) and email <> ''),
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- profiles: users との唯一の接点
 -- ============================================================
 create table pollenia.profiles (
-  id           uuid primary key references auth.users (id) on delete cascade,
+  id           uuid primary key references pollenia.users (id) on delete cascade,
   display_name text not null,
   bio          text,
-  avatar_path  text,  -- Supabase Storage のパス（バケットは pollenia- prefix）
+  avatar_path  text,  -- R2 のオブジェクトキー（未使用・将来のアバター用）
   created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
+  updated_at   timestamptz not null default now(),
+  -- 課金（Stripe 月額サブスク ¥300/月）。旧 0006_billing。
+  -- subscription_status の意味:
+  --   free      … 未加入（既定）。AI 機能は 402。
+  --   active    … 課金中（初回契約・継続課金成功）。AI 機能を許可。
+  --   past_due  … 支払い失敗の猶予中（Stripe の自動リトライ期間）。AI 機能は許可し続ける
+  --               （即時停止しない。Stripe がリトライを打ち切ると .deleted / unpaid で free/canceled に落ちる）。
+  --   canceled  … 解約確定・回収不能で終了。AI 機能は 402。
+  -- 判定ロジックは Worker（lib/stripe.ts の isEntitled）に集約する。
+  subscription_status text not null default 'free'
+    check (subscription_status in ('free', 'active', 'past_due', 'canceled')),
+  -- Stripe Customer（cus_...）。Webhook は基本これで対象プロフィールを引く。
+  stripe_customer_id text,
+  -- Stripe Subscription（sub_...）。解約時は null に戻す。
+  stripe_subscription_id text,
+  -- 現在の課金期間の終了（＝次回更新日時）。UI 表示・期限切れの参考情報。
+  -- Webhook（customer.subscription.created/updated）で同期し、解約（.deleted）で null に戻す。
+  -- 利用可否の判定は subscription_status が正であり、このカラムでは判定しない
+  -- （Stripe の dunning 設定に猶予を委譲する方針。routes/billing.ts 参照）。
+  current_period_end timestamptz
 );
 
 -- ============================================================
@@ -44,6 +88,10 @@ create table pollenia.plants (
   species     text,  -- 属・種の自由入力。検索需要が出たらマスタテーブル化
   visibility  pollenia.visibility not null default 'private',
   notes       text,
+  -- 構造化特性（旧 0004）。自由記述の notes とは別に、AI が集計・比較しやすい値だけを持つ。
+  -- 全項目任意・空 {} を許容。書き込みは Worker（lib/traits.ts で既知キーのみに正規化）経由で、
+  -- defense in depth として JSON オブジェクト以外を CHECK で弾く。可視性は visibility 列に従う。
+  traits      jsonb not null default '{}'::jsonb check (jsonb_typeof(traits) = 'object'),
   deleted_at  timestamptz,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -101,9 +149,12 @@ create table pollenia.plant_photos (
   id           uuid primary key default gen_random_uuid(),
   plant_id     uuid not null references pollenia.plants (id) on delete cascade,
   user_id      uuid not null references pollenia.profiles (id) on delete cascade,
-  storage_path text not null,  -- バケット内パス。URL は署名付きで都度発行するため保存しない
+  storage_path text not null,  -- R2 のオブジェクトキー。閲覧 URL は Worker が都度署名するため保存しない
   caption      text,
   taken_at     date,
+  -- R2 への PUT が終わった時刻。行は先に作るので、未アップロード（null）の行は一覧に出さず、
+  -- 2回目以降の PUT も受け付けない（PUT /api/photos/:id）
+  uploaded_at  timestamptz,
   created_at   timestamptz not null default now()
 );
 
@@ -164,7 +215,9 @@ create index idx_sowings_harvest on pollenia.sowings (seed_harvest_id);
 create index idx_sowings_user on pollenia.sowings (user_id);
 create index idx_plant_photos_plant on pollenia.plant_photos (plant_id);
 
-create index idx_posts_user on pollenia.posts (user_id);
+-- フィード（user_id in (フォロー中) order by created_at desc）とプロフィール投稿一覧を
+-- 1本で賄う（旧 0003。単柱の user_id インデックスは先頭カラムが重複するので張らない）
+create index idx_posts_user_created on pollenia.posts (user_id, created_at desc);
 create index idx_posts_crossing on pollenia.posts (crossing_id)
   where crossing_id is not null;
 create index idx_posts_feed on pollenia.posts (created_at desc);
@@ -196,9 +249,9 @@ create trigger trg_posts_updated before update on pollenia.posts
 -- ============================================================
 
 -- security_invoker=true 必須。省略するとビューは所有者権限で実行され、
--- 配下 plants/crossings の RLS がバイパスされる（PostgREST 直読みで全ユーザーの
--- 交配グラフが漏れる）。invoker にすることで Phase 1 の deny-all 下では anon に対し
--- fail-closed になり、service_role を使う Worker / definer 関数からは従来どおり読める。
+-- 配下 plants/crossings の RLS がバイパスされる（所有者以外のロールに全ユーザーの
+-- 交配グラフが漏れる）。invoker にすることで deny-all 下では所有者以外に対し
+-- fail-closed になり、所有者ロールで接続する Worker / definer 関数からは従来どおり読める。
 create view pollenia.plant_parents
   with (security_invoker = true) as
 select
@@ -211,11 +264,10 @@ join pollenia.sowings s       on s.id = p.origin_sowing_id
 join pollenia.seed_harvests h on h.id = s.seed_harvest_id
 join pollenia.crossings c     on c.id = h.crossing_id;
 
--- 可視性判定ヘルパー（明示 viewer 版）。
--- can_view() は auth.uid() を使うが、Worker は service_role で呼ぶため auth.uid()=NULL に
--- なる。系統樹関数は「誰の視点で刈り込むか」を引数で受ける必要があるため、viewer を明示で
--- 取るこちらを土台にする。p_viewer が NULL の呼び出し＝匿名（公開系統ページ）で、public のみ可視。
--- security definer にする理由は can_view() と同じ（followers 判定で follows を読むため）。
+-- 可視性判定ヘルパー（viewer を明示で取る）。
+-- 系統樹関数は「誰の視点で刈り込むか」を引数で受ける。p_viewer が NULL の呼び出し＝匿名
+-- （公開系統ページ）で、public のみ可視。security definer にするのは、所有者以外のロールから
+-- 呼ばれても followers 判定で follows を読めるようにするため。
 create or replace function pollenia.can_view_as(
   p_viewer     uuid,
   p_owner      uuid,
@@ -382,12 +434,79 @@ $$;
 
 -- ============================================================
 -- 関数の実行権限
--- 新規関数は既定で PUBLIC に EXECUTE が付く。pollenia を PostgREST に露出した場合
--- anon が直接呼べてしまうため PUBLIC から剥奪し、Worker が使う service_role にだけ付与する。
--- can_view_as は definer 関数（get_*）の内部からのみ呼ばれるので誰にも grant しない。
+-- 新規関数は既定で PUBLIC に EXECUTE が付く。所有者以外のロールが definer 関数を
+-- 直接呼べないよう PUBLIC から剥奪する。Worker は所有者ロールで接続するので
+-- 明示 grant は不要（所有者の EXECUTE は revoke from public の影響を受けない）。
+-- can_view_as は definer 関数（get_*）の内部からのみ呼ばれる。
 -- ============================================================
+revoke execute on function pollenia.set_updated_at()                              from public;
 revoke execute on function pollenia.can_view_as(uuid, uuid, pollenia.visibility)  from public;
 revoke execute on function pollenia.get_ancestors(uuid, uuid, int)                from public;
 revoke execute on function pollenia.get_descendants(uuid, uuid, int)              from public;
-grant  execute on function pollenia.get_ancestors(uuid, uuid, int)                to service_role;
-grant  execute on function pollenia.get_descendants(uuid, uuid, int)              to service_role;
+
+-- ============================================================
+-- 育種相談 AI（RAG）+ 出品文生成（旧 0005）
+--   * knowledge-rag の pgvector 構成（chunks テーブル + コサイン近傍検索）を踏襲する。
+--     近傍検索は RPC ではなく Worker からの素の SQL（lib/ai/rag.ts に集約。必ず user_id で絞る）。
+--   * チャンクは「ユーザー自身の plants / crossings / seed_harvests / sowings」の
+--     正規化テキスト。posts / comments は対象外（プロダクト方針。CHECK で物理的に排除）。
+--   * 同期はチャット時の遅延同期（Worker が content_hash を比較して差分のみ再埋め込み）。
+--   * ai_usage_events は Anthropic API 呼び出しのレート制限・利用量把握の元データ。
+-- ============================================================
+create table pollenia.ai_chunks (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references pollenia.profiles (id) on delete cascade,
+  source_type  text not null check (source_type in ('plant', 'crossing', 'seed_harvest', 'sowing')),
+  source_id    uuid not null,
+  content      text not null,
+  -- content の SHA-256（hex）。差分検知用（同一なら再埋め込みしない）
+  content_hash text not null,
+  -- 1536 次元（knowledge-rag と同じ。embeddings provider 側で次元を揃える）
+  embedding    vector(1536),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (user_id, source_type, source_id)
+);
+
+-- ベクトルインデックスは張らない。検索は user_id で絞った後の少量データ
+-- （1ユーザー数百件想定）の seq scan で十分。数万件級になったら ivfflat 等を検討する。
+create index idx_ai_chunks_user on pollenia.ai_chunks (user_id);
+
+create trigger trg_ai_chunks_updated before update on pollenia.ai_chunks
+  for each row execute function pollenia.set_updated_at();
+
+create table pollenia.ai_usage_events (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references pollenia.profiles (id) on delete cascade,
+  kind       text not null check (kind in ('consult', 'listing')),
+  created_at timestamptz not null default now()
+);
+
+-- レート制限判定（直近1分・当日・30日）の count 用。
+create index idx_ai_usage_user_created on pollenia.ai_usage_events (user_id, created_at desc);
+
+-- ============================================================
+-- 課金（旧 0006）。Webhook は stripe_customer_id で対象を特定する。
+-- 1 Customer = 1 Pollenia ユーザーなので一意（NULL は複数許容の部分インデックス）。
+-- ============================================================
+create unique index idx_profiles_stripe_customer on pollenia.profiles (stripe_customer_id)
+  where stripe_customer_id is not null;
+
+-- ============================================================
+-- RLS（旧 0002）: 全テーブル有効 + ポリシー無し = deny-all。
+-- 所有者ロール（Worker）は RLS をバイパスするので、実運用の認可は Worker + 系統樹関数が担う。
+-- ここは所有者以外のロールに対する最終防衛線。
+-- ============================================================
+alter table pollenia.users           enable row level security;
+alter table pollenia.profiles        enable row level security;
+alter table pollenia.plants          enable row level security;
+alter table pollenia.crossings       enable row level security;
+alter table pollenia.seed_harvests   enable row level security;
+alter table pollenia.sowings         enable row level security;
+alter table pollenia.plant_photos    enable row level security;
+alter table pollenia.posts           enable row level security;
+alter table pollenia.follows         enable row level security;
+alter table pollenia.likes           enable row level security;
+alter table pollenia.comments        enable row level security;
+alter table pollenia.ai_chunks       enable row level security;
+alter table pollenia.ai_usage_events enable row level security;
