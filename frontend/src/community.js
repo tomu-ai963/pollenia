@@ -11,7 +11,6 @@ const $ = (id) => document.getElementById(id);
 const PAGE_SIZE = 20;
 
 // initCommunity で注入されるコンテキスト:
-//   token()    … 現在の Supabase アクセストークン
 //   me         … 自分の profile（/api/me の返却値）
 //   switchTab  … タブ切り替え（app.js が実装）
 let ctx = null;
@@ -66,7 +65,7 @@ function bindHandlers() {
 // 交配記録を新規作成したら app.js から再呼び出しされる。
 export async function loadCrossingOptions() {
   try {
-    const { crossings } = await api.listCrossings(ctx.token());
+    const { crossings } = await api.listCrossings();
     const sel = $('post-crossing');
     sel.replaceChildren();
     const none = document.createElement('option');
@@ -94,7 +93,7 @@ async function createPost() {
   try {
     const body = { content, visibility: $('post-visibility').value };
     if ($('post-crossing').value) body.crossing_id = $('post-crossing').value;
-    await api.createPost(ctx.token(), body);
+    await api.createPost(body);
     $('post-content').value = '';
     $('post-crossing').value = '';
     // フィードはフォロー中ユーザーの投稿のみ（自分の投稿は含まれない）ため、
@@ -115,7 +114,7 @@ async function refreshFeed() {
 }
 
 async function loadMoreFeed() {
-  const { posts } = await api.feed(ctx.token(), { limit: PAGE_SIZE, offset: feedOffset });
+  const { posts } = await api.feed({ limit: PAGE_SIZE, offset: feedOffset });
   const first = feedOffset === 0;
   feedOffset += posts.length;
   for (const p of posts) $('feed-list').appendChild(renderPost(p));
@@ -172,12 +171,12 @@ function renderPost(post) {
     likeBtn.disabled = true;
     try {
       if (liked) {
-        await api.unlikePost(ctx.token(), post.id);
+        await api.unlikePost(post.id);
         liked = false;
         // DELETE は like_count を返さないためローカルで減算
         likeCount = Math.max(0, likeCount - 1);
       } else {
-        const r = await api.likePost(ctx.token(), post.id);
+        const r = await api.likePost(post.id);
         liked = true;
         likeCount = r.like_count;
       }
@@ -242,7 +241,7 @@ async function mountComments(postId, container, onAdded) {
   const list = document.createElement('div');
   container.appendChild(list);
 
-  const { comments } = await api.listComments(ctx.token(), postId);
+  const { comments } = await api.listComments(postId);
   for (const c of comments) list.appendChild(renderComment(c));
 
   const form = document.createElement('div');
@@ -258,7 +257,7 @@ async function mountComments(postId, container, onAdded) {
     if (!content) return;
     send.disabled = true;
     try {
-      const { comment } = await api.createComment(ctx.token(), postId, content);
+      const { comment } = await api.createComment(postId, content);
       list.appendChild(renderComment(comment));
       input.value = '';
       onAdded();
@@ -307,7 +306,7 @@ export async function openProfile(userId) {
   $('btn-profile-more').classList.add('hidden');
 
   try {
-    const { profile } = await api.getUser(ctx.token(), userId);
+    const { profile } = await api.getUser(userId);
     $('profile-name').textContent = profile.display_name;
     $('profile-bio').textContent = profile.bio ?? '';
     $('follower-count').textContent = profile.follower_count;
@@ -333,8 +332,8 @@ function paintFollowButton(btn, following) {
   btn.onclick = async () => {
     btn.disabled = true;
     try {
-      if (following) await api.unfollow(ctx.token(), profileUserId);
-      else await api.follow(ctx.token(), profileUserId);
+      if (following) await api.unfollow(profileUserId);
+      else await api.follow(profileUserId);
       // フォロー状態・フォロワー数・可視投稿（followers 分）が変わるため再読込
       await openProfile(profileUserId);
       await refreshFeed();
@@ -347,7 +346,7 @@ function paintFollowButton(btn, following) {
 }
 
 async function loadMoreProfilePosts() {
-  const { posts } = await api.listUserPosts(ctx.token(), profileUserId, {
+  const { posts } = await api.listUserPosts(profileUserId, {
     limit: PAGE_SIZE,
     offset: profileOffset,
   });
@@ -370,8 +369,8 @@ async function toggleFollowList(direction) {
   try {
     const { users } =
       direction === 'followers'
-        ? await api.listFollowers(ctx.token(), profileUserId)
-        : await api.listFollowing(ctx.token(), profileUserId);
+        ? await api.listFollowers(profileUserId)
+        : await api.listFollowing(profileUserId);
     const title = document.createElement('div');
     title.className = 'meta';
     title.textContent = direction === 'followers' ? 'フォロワー' : 'フォロー中';
