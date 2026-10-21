@@ -7,11 +7,17 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:up": "node scripts/setup-local.mjs && docker compose -f ../docker-compose.yml --env-file ../.env up -d --wait",
+    "db:down": "docker compose -f ../docker-compose.yml --env-file ../.env down",
+    "db:reset": "docker compose -f ../docker-compose.yml --env-file ../.env down -v",
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@supabase/supabase-js": "^2.45.4",
+    "@tomu-ai/workers-auth": "github:tomu-ai963/workers-auth#v0.3.1",
+    "hono": "^4.13.13",
     "postgres": "^3.4.5"
   },
   "devDependencies": {
