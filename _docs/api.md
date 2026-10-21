@@ -1,22 +1,37 @@
 # Pollenia Worker API（叩き台）
 
-認証: Supabase Auth の JWT を `Authorization: Bearer` で受け、Worker が `auth.getUser` で検証。
-さらに `pollenia.profiles` 行の存在で「Pollenia ユーザーか」を判定する（README「掟」5。
-有効な JWT だけでは認可しない — 共有 Auth レルムの他プロダクト JWT も検証は通るため）。
+画面と API は同じ Worker・同じオリジン（本番 https://pollenia.tomu-ai.dev）。
 
-Worker → DB は postgres.js の TCP 直接続（`DATABASE_URL`）。pollenia スキーマは
-PostgREST 非露出のため supabase-js の DB アクセスは使わない（README 参照）。
-supabase-js は JWT 検証と Storage 署名URL発行のみ。
+認証: `@tomu-ai/workers-auth` の deviceAuth（`/auth/device/*`）が発行するセッション Cookie
+（`__Host-` 付き・HttpOnly）。状態を変えるリクエストは `__Host-csrf` Cookie の値を
+`x-csrf-token` ヘッダで送り返す（Origin も検査される）。未ログインは 401 `{"error":"unauthenticated"}`。
+さらに `pollenia.profiles` 行の存在で「Pollenia ユーザーか」を判定する（無ければ 403。
+メールコードを通っただけで表示名未登録の users 行がありうるため）。
+
+Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）。
+
+## ログイン（workers-auth deviceAuth）
+
+| Method | Path | 内容 |
+|---|---|---|
+| POST | /auth/device/email/start | `{email}` にログインコードを送る（どのアドレスにも同じ 200） |
+| POST | /auth/device/email/verify | `{email, code}` → セッション + 端末を信頼済みに。`{pinSet}`。初めてのアドレスは `pollenia.users` を作る |
+| POST | /auth/device/pin | `{pin}` PIN の設定・変更（メールコード認証から10分以内）。変更時は他端末と全セッションを失効 |
+| POST | /auth/device/pin/login | `{pin}` 信頼済み端末で PIN ログイン。3回失敗でメールコード必須 |
+| POST | /auth/device/logout | セッション終了（端末は信頼済みのまま） |
+| GET/POST | /auth/device/devices ほか | 端末一覧・失効（SDK の README 参照） |
 
 ## Phase 1（MVP）
 
 | Method | Path | 内容 |
 |---|---|---|
-| POST | /api/profiles | Pollenia への初回登録（JWT のみで受け、自 uid の profiles 行を作成。冪等） |
+| POST | /api/profiles | Pollenia への初回登録（セッションのみで受け、自 uid の profiles 行を作成。冪等） |
 | GET | /api/me | 自分のプロフィール |
 | GET/POST | /api/plants | 個体一覧・登録 |
 | GET/PATCH/DELETE | /api/plants/:id | 個体詳細・更新・soft delete |
-| POST | /api/plants/:id/photos | 写真アップロード（Storage 署名URL発行） |
+| POST | /api/plants/:id/photos | 写真行の作成。`upload: {url, method: "PUT", content_type}` を返す |
+| PUT | /api/photos/:id | 写真本体のアップロード（R2。自分の未アップロード行に1回だけ・10MB まで） |
+| GET | /photos/:token | 写真の閲覧（Worker が可視性判定後に署名した URL。1時間で失効・認証不要） |
 | GET/POST | /api/crossings | 交配記録 |
 | POST | /api/crossings/:id/harvests | 採種記録 |
 | POST | /api/harvests/:id/sowings | 播種記録 |
@@ -32,7 +47,7 @@ supabase-js は JWT 検証と Storage 署名URL発行のみ。
 
 | エンドポイント | 認証 | `p_viewer` に渡す値 |
 |---|---|---|
-| `GET /api/plants/:id/lineage` | 必須 | 検証済み JWT の uid（`auth.uid()` 相当） |
+| `GET /api/plants/:id/lineage` | 必須 | 検証済みセッションの uid（`pollenia.users.id`） |
 | `GET /public/plants/:id` | 不要 | **`null`**（＝匿名。visibility=public のノードのみ返る） |
 
 - `direction=up` → `get_ancestors`、`down` → `get_descendants`。
@@ -58,7 +73,7 @@ supabase-js は JWT 検証と Storage 署名URL発行のみ。
   原則「判定は常に対象データ自身の visibility 列 + 所有者。参照元エンティティの公開状態を
   継承しない」。Phase 2 の posts → crossing 展開は必ずこのモジュールを経由すること。
 
-## Phase 2（実装済み。すべて JWT + profiles 行を要求）
+## Phase 2（実装済み。すべてセッション + profiles 行を要求）
 
 | Method | Path | 内容 |
 |---|---|---|
@@ -90,7 +105,7 @@ supabase-js は JWT 検証と Storage 署名URL発行のみ。
 - follow / like / comment 作成のレート制限は Worker 実装には無い。スパム対策は
   Cloudflare 側の WAF / Rate Limiting ルールで担保する（本番運用時に設定）。
 
-## Phase 3（AI。実装済み — 無料開放期間。すべて JWT + profiles 行を要求）
+## Phase 3（AI。実装済み — Phase 4 で有料ゲート化。すべてセッション + profiles 行を要求）
 
 | Method | Path | 内容 |
 |---|---|---|

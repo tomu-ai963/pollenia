@@ -277,10 +277,12 @@ export async function handleUploadPhoto(
 ): Promise<Response> {
   if (!isUuid(photoId)) return errorResponse('NOT_FOUND');
 
+  // Content-Length 必須（chunked で上限を超える本文をメモリに読み込ませない。ブラウザの fetch は
+  // File / Blob の本文に必ず付ける）
   const declared = Number(req.headers.get('content-length') ?? NaN);
-  if (Number.isFinite(declared) && declared > PHOTO_MAX_BYTES) {
+  if (!Number.isFinite(declared) || declared <= 0 || declared > PHOTO_MAX_BYTES) {
     return errorResponse('VALIDATION_ERROR', {
-      publicMessage: `画像は ${PHOTO_MAX_BYTES / 1024 / 1024}MB までです。`,
+      publicMessage: `画像は 1 バイト以上 ${PHOTO_MAX_BYTES / 1024 / 1024}MB までです（Content-Length が必要）。`,
     });
   }
 
