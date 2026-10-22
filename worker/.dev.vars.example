@@ -12,9 +12,8 @@ DEVICE_AUTH_SECRET="<npm run db:up が生成>"
 MOCK_MAIL="1"
 # PIN の PBKDF2 反復回数。ローカルは軽くしてよい（本番は未設定 = 100,000）。
 PIN_PBKDF2_ITERATIONS="1000"
-# 実メールを試すときだけ（MOCK_MAIL を消して設定する）。送信元は tomu-ai.dev のアドレス。
+# 実メールを試すときだけ（MOCK_MAIL を消して設定する）。送信元 MAIL_FROM は wrangler.toml の [vars]。
 # RESEND_API_KEY="<re_...>"
-# MAIL_FROM="Pollenia <noreply@tomu-ai.dev>"
 
 # --- AI（Phase 3: 育種相談・出品文生成）---
 # Anthropic API キー。未設定だと /api/ai/* は 500 になる（他機能には影響しない）。
