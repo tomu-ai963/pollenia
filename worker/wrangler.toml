@@ -33,11 +33,10 @@ bucket_name = "pollenia-photos"
 # 接続文字列（パスワード含む）は Cloudflare 側の Hyperdrive 設定にのみ保存され、
 # コード・この toml・シークレットのどこにも置かない。
 #
-# 下の id は未作成を示すダミー（旧 Supabase 用の設定 786b6bea... は使わない）。
-# この値のままでは deploy が失敗する（意図的）。
+# 旧 Supabase 用の設定 pollenia-db（786b6bea...）は使わない（旧構成の片付けで削除予定）。
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "00000000000000000000000000000000"
+id = "141ea6360094407eb11b2da6ae687f5d"  # pollenia-neon（origin: Neon pollenia / caching disabled）
 # ローカルの接続先は toml に書かない（パスワードがランダム生成のため）。`npm run dev` が
 # リポジトリ直下 .env の DATABASE_URL を CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE
 # として wrangler dev に渡す（scripts/dev.mjs）。
