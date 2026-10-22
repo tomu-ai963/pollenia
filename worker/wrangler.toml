@@ -9,6 +9,10 @@ compatibility_flags = ["nodejs_compat"]
 # コードにも wrangler.toml にも書かない。ローカルは .dev.vars、本番は `wrangler secret put`。
 # .dev.vars.example を参照。
 
+# 秘密ではない設定値。ログインコードのメール送信元（Resend で tomu-ai.dev は verified）。
+[vars]
+MAIL_FROM = "Pollenia <noreply@tomu-ai.dev>"
+
 # --- 画面（frontend/ をそのまま静的配信。ビルドなし）---
 # 静的ファイルに一致したパスは Worker を通らずに返る。一致しないパス（/api/*・/auth/*・
 # /public/plants/*・/photos/*）が Worker に来る。画面と API が同じオリジンになるので、
