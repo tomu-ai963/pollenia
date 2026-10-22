@@ -82,8 +82,11 @@ npm run typecheck && npm test
 6. deploy（worker/ で実行）→ Custom Domain `pollenia.tomu-ai.dev` を付与
 7. Stripe の Webhook URL を https://pollenia.tomu-ai.dev/api/billing/webhook に変更
 8. 旧構成の片付け: tomu-system の `pollenia` スキーマ・`pollenia_worker` ロール・`pollenia-` バケット、
-   旧 Hyperdrive 設定（pollenia-db）、Pages プロジェクト pollenia
+   旧 Hyperdrive 設定（pollenia-db）、Pages プロジェクト pollenia、workers.dev
 ```
+
+2026-10-22 に 1〜8 を実施済み（Neon プロジェクト `delicate-bread-60834234`、Hyperdrive `pollenia-neon`、
+公開は https://pollenia.tomu-ai.dev のみ。workers.dev は `workers_dev = false` で停止）。
 
 ## 運用の掟
 

@@ -11,8 +11,8 @@ compatibility_flags = ["nodejs_compat"]
 
 # 公開 URL。Worker Custom Domain（deploy 時に DNS レコードと証明書が作られる。他の tomu アプリと同じ方式）。
 routes = [{ pattern = "pollenia.tomu-ai.dev", custom_domain = true }]
-# workers.dev も当面残す（Stripe Webhook の移行と旧 URL からの切り替えが済むまで）。
-workers_dev = true
+# workers.dev は使わない（2026-10-22 停止。Stripe Webhook も pollenia.tomu-ai.dev に移行済み）。
+workers_dev = false
 
 # 秘密ではない設定値。ログインコードのメール送信元（Resend で tomu-ai.dev は verified）。
 [vars]
