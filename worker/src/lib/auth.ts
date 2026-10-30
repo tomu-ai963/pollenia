@@ -1,4 +1,5 @@
-import { type Auth, type AuthEvent, type AuthUser, createAuth } from '@tomu-ai/workers-auth';
+import type { Context } from 'hono';
+import { type Auth, type AuthEvent, type AuthUser, type WaitUntilContext, createAuth } from '@tomu-ai/workers-auth';
 import { type DeviceAuth, deviceAuth, deviceBoundSessionStore } from '@tomu-ai/workers-auth/device-auth';
 import {
   type PgExecutor,
@@ -12,7 +13,7 @@ import type { Sql } from './db';
 import { errorResponse } from './error-response';
 import { createMailer } from './mail';
 
-// ログイン: workers-auth v0.3.1 の deviceAuth（PIN + 信頼済み端末 + メールコード）。
+// ログイン: workers-auth v1.1.0 の deviceAuth（PIN + 信頼済み端末 + メールコード）。
 //
 //   新しい端末:   メール → 6 桁コード → セッション + 端末を信頼済みに登録 → （未設定なら）PIN 設定
 //   信頼済み端末: PIN だけ。3 回続けて間違えると、メールコードが通るまで PIN ログインは止まる
@@ -108,8 +109,26 @@ export class AuthConfigError extends Error {
   }
 }
 
+// リクエストの ExecutionContext。Hono の c.executionCtx は無い場面（テストの app.request() など）で
+// getter が例外を投げるので、取れなければ undefined（ストアは DELETE を待つ従来の動きになる）。
+export function executionCtxOf(c: Context): WaitUntilContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
+
 // リクエストごとに組み立てる（バインディングと DB 接続はリクエストの中にしか無いため）。
-export function buildAuth(env: Env, sql: Sql, requestUrl: string): AuthContext {
+// executionCtx はそのリクエストのもの（無い場面では undefined）。期限切れセッションの DELETE は
+// get() の中ですぐ発行され、待つ処理だけが waitUntil に移る（同じ sql 接続のキューに入るので、
+// index.ts の waitUntil(sql.end()) より先に流れる）。
+export function buildAuth(
+  env: Env,
+  sql: Sql,
+  requestUrl: string,
+  executionCtx?: WaitUntilContext,
+): AuthContext {
   const secret = env.DEVICE_AUTH_SECRET?.trim();
   if (!secret) throw new AuthConfigError('DEVICE_AUTH_SECRET が設定されていません');
   const mailer = createMailer(env, requestUrl);
@@ -117,7 +136,7 @@ export function buildAuth(env: Env, sql: Sql, requestUrl: string): AuthContext {
 
   const executor = postgresExecutor(sql);
   const devices = pgDeviceAuthStore(executor);
-  const sessions = deviceBoundSessionStore(pgSessionStore(executor), devices);
+  const sessions = deviceBoundSessionStore(pgSessionStore(executor, { executionCtx }), devices);
 
   const auth = createAuth({
     providers: [],

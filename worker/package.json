@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
-    "@tomu-ai/workers-auth": "github:tomu-ai963/workers-auth#v0.3.1",
+    "@tomu-ai/workers-auth": "github:tomu-ai963/workers-auth#v1.1.0",
     "hono": "^4.13.13",
     "postgres": "^3.4.5"
   },

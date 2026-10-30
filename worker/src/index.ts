@@ -9,6 +9,7 @@ import {
   AuthConfigError,
   authenticateUser,
   buildAuth,
+  executionCtxOf,
   type AuthContext,
   type AuthedUser,
 } from './lib/auth';
@@ -137,7 +138,7 @@ app.all('/api/billing/webhook', (c) => {
 // ログイン系とセッション必須の API だけが workers-auth を組み立てる（シークレット未設定でも
 // 公開ページ・写真・Webhook は動く）。
 const withAuth = createMiddleware<AppEnv>(async (c, next) => {
-  c.set('authCtx', buildAuth(c.env, c.var.sql, c.req.url));
+  c.set('authCtx', buildAuth(c.env, c.var.sql, c.req.url, executionCtxOf(c)));
   await next();
 });
 
