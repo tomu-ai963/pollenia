@@ -8,7 +8,7 @@
 
 - 配信: Cloudflare Workers 1つ（`worker/`）。画面 `frontend/`（静的・ビルドなし）は `[assets]` で同じ Worker から配信
 - DB: **Neon**（Postgres + pgvector）。Worker からは Hyperdrive（`--caching-disabled`）経由の postgres.js
-- 認証: `@tomu-ai/workers-auth` v0.3.1 の deviceAuth（メールコード → 信頼済み端末 + PIN。Cookie・同一オリジン）。
+- 認証: `@tomu-ai/workers-auth` v1.1.0 の deviceAuth（メールコード → 信頼済み端末 + PIN。Cookie・同一オリジン）。
   登録は誰でも可。メール送信は Resend（tomu-ai.dev）
 - 写真: Cloudflare R2（`pollenia-photos`。閲覧は Worker が署名した `/photos/<token>`）
 - AI: Anthropic API（`worker/src/lib/ai/`）/ 課金: Stripe（月額 ¥300。AI 機能の有料ゲート）
