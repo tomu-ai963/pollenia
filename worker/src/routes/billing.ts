@@ -230,6 +230,7 @@ async function onSubscriptionUpdated(sql: Sql, subscription: any): Promise<void>
   const customerId = asId(subscription.customer);
   const subscriptionId = asId(subscription.id);
   const periodEnd = subscriptionPeriodEnd(subscription);
+  const ending = endsAtPeriodEnd(subscription);
   const uid: string | undefined = subscription.metadata?.uid;
 
   if (customerId) {
@@ -237,7 +238,8 @@ async function onSubscriptionUpdated(sql: Sql, subscription: any): Promise<void>
       update pollenia.profiles set
         subscription_status = ${status},
         stripe_subscription_id = ${subscriptionId},
-        current_period_end = ${periodEnd}
+        current_period_end = ${periodEnd},
+        cancel_at_period_end = ${ending}
       where stripe_customer_id = ${customerId}
       returning id
     `;
@@ -249,6 +251,7 @@ async function onSubscriptionUpdated(sql: Sql, subscription: any): Promise<void>
         subscription_status = ${status},
         stripe_subscription_id = ${subscriptionId},
         current_period_end = ${periodEnd},
+        cancel_at_period_end = ${ending},
         stripe_customer_id = coalesce(stripe_customer_id, ${customerId})
       where id = ${uid}::uuid
     `;
@@ -265,7 +268,8 @@ async function onSubscriptionDeleted(sql: Sql, subscription: any): Promise<void>
       update pollenia.profiles set
         subscription_status = 'free',
         stripe_subscription_id = null,
-        current_period_end = null
+        current_period_end = null,
+        cancel_at_period_end = false
       where stripe_customer_id = ${customerId}
       returning id
     `;
@@ -276,7 +280,8 @@ async function onSubscriptionDeleted(sql: Sql, subscription: any): Promise<void>
       update pollenia.profiles set
         subscription_status = 'free',
         stripe_subscription_id = null,
-        current_period_end = null
+        current_period_end = null,
+        cancel_at_period_end = false
       where id = ${uid}::uuid
     `;
   }
@@ -324,6 +329,19 @@ function subscriptionPeriodEnd(subscription: any): Date | null {
       ? subscription.current_period_end
       : subscription?.items?.data?.[0]?.current_period_end;
   return typeof epoch === 'number' ? new Date(epoch * 1000) : null;
+}
+
+// 今の期間の終わりで契約が終わるか（＝解約を予約しているか）。profiles.cancel_at_period_end に入れる値。
+// **cancel_at_period_end だけを見ない。** Stripe の API 2026-11-18 では、カスタマーポータルで解約すると
+// cancel_at_period_end は false のままで、cancel_at に期間の終わりの日時が入る（2026-11-21 に TOMU GARDEN の
+// テスト環境で実測。種日和の stripe-sync.ts の endsAtPeriodEnd と同じ判定）。cancel_at が期間の終わりより
+// 後なら、今の期間の終わりで一度更新されるので解約予約とは扱わない。
+export function endsAtPeriodEnd(subscription: any): boolean {
+  if (subscription?.cancel_at_period_end === true) return true;
+  const cancelAt = subscription?.cancel_at;
+  if (typeof cancelAt !== 'number') return false;
+  const end = subscriptionPeriodEnd(subscription);
+  return end === null || cancelAt * 1000 <= end.getTime();
 }
 
 // Stripe のフィールドは文字列 ID か、展開済みオブジェクト（{id}）のことがある。ID 文字列に正規化。

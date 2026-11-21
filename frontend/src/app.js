@@ -5,6 +5,7 @@ import { renderAncestors, renderDescendants } from './lineage-render.js';
 import { initCommunity, openMyProfile, loadCrossingOptions } from './community.js';
 import { initAi, resetListingUi } from './ai.js';
 import { reencodePhoto } from './photo-image.js';
+import { planLabel } from './plan-label.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -48,27 +49,14 @@ $('tabbtn-profile').onclick = () => openMyProfile();
 
 // ---- 課金（プラン加入導線） -------------------------------------------------
 
-const PLAN_LABEL = {
-  active: '加入中（有料プラン）',
-  past_due: '加入中（お支払い確認中）',
-  canceled: '解約済み',
-  free: '未加入（無料）',
-};
-
 function renderPlan() {
-  const status = me?.subscription_status ?? 'free';
-  let label = `現在のプラン: ${PLAN_LABEL[status] ?? status}`;
-  // 次回更新日（Webhook が同期する current_period_end）。加入中のみ添える。
-  if (isSubscribed() && me?.current_period_end) {
-    const d = new Date(me.current_period_end);
-    if (!Number.isNaN(d.getTime())) {
-      label += `（次回更新: ${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}）`;
-    }
-  }
-  $('plan-status').textContent = label;
+  // 表示文は plan-label.js（解約予約なら「終了予定」、そうでなければ「次回更新」）
+  $('plan-status').textContent = planLabel(me);
   // 未加入・解約済みのときだけ加入ボタン・説明を出す。加入中はポータル導線を出す。
   show('btn-subscribe', !isSubscribed());
   show('plan-desc', !isSubscribed());
+  // 料金・規約の案内は申し込む前の人向け。加入中（解約予約を含む）は出さない。
+  show('plan-terms', !isSubscribed());
   show('btn-portal', isSubscribed());
 }
 

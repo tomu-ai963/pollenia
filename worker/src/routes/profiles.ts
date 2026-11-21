@@ -45,7 +45,7 @@ export async function handleCreateProfile(req: Request, sql: Sql, uid: string): 
 // stripe_customer_id 等の内部 ID はクライアントに返さない）。
 export async function handleGetMe(sql: Sql, user: AuthedUser): Promise<Response> {
   const rows = await sql`
-    select id, display_name, bio, avatar_path, subscription_status, current_period_end,
+    select id, display_name, bio, avatar_path, subscription_status, current_period_end, cancel_at_period_end,
       created_at, updated_at
     from pollenia.profiles where id = ${user.uid}::uuid
   `;
