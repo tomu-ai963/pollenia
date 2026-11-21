@@ -1,0 +1,21 @@
+/* 法務ページ（/legal/*）だけの体裁。色の変数は src/styles.css のものを使う。 */
+.legal {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 56px;
+  color: var(--ink);
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.legal h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+.legal h2 { font-size: 1.05rem; margin: 28px 0 8px; }
+.legal ul { padding-left: 1.2em; }
+.legal li { margin: 4px 0; }
+.legal a { color: var(--honey-ink); }
+.legal-date { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; }
+.legal-back { font-size: 0.9rem; margin: 0; }
+.legal-links { margin-top: 32px; font-size: 0.9rem; }
+.legal-table { margin: 0; }
+.legal-table > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.legal-table dt { font-size: 0.8rem; font-weight: 700; color: var(--muted); }
+.legal-table dd { margin: 4px 0 0; }
