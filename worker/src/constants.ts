@@ -22,11 +22,12 @@ export const PHOTO_SIGNED_URL_SECONDS = 3600;
 // アップロード 1 枚の上限（PUT /api/photos/:id の本文）。
 export const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 
-// 受け付ける画像の content-type → 拡張子。
+// 受け付ける画像の content-type → 拡張子。**新しいアップロードは JPEG だけ**（2026-11-21〜）。
+// 画面が写真を描き直して JPEG にし（位置情報などのメタデータが落ちる）、サーバは lib/jpeg.ts で
+// メタデータが無いことを確かめる。PNG・WebP はその検査を持たないので受け付けない
+// （それ以前に保存された PNG・WebP の写真は、R2 に保存した Content-Type のまま配信される）。
 export const PHOTO_CONTENT_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
 };
 
 // テキスト入力の上限（暴発防止）。
