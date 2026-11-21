@@ -34,6 +34,11 @@ describe('法務ページ', () => {
     expect(around).toContain('href="/legal/tokushoho"');
   });
 
+  it('料金・規約の案内は未加入のときだけ出す（加入中の人に「お申し込みの前に」と出さない）', () => {
+    expect(read('index.html')).toContain('<p class="notice" id="plan-terms">月額 300 円（税込）');
+    expect(read('src/app.js')).toContain("show('plan-terms', !isSubscribed());");
+  });
+
   it('料金の表記がそろっている（画面・特商法・規約）', () => {
     expect(read('index.html')).toContain('¥300/月');
     expect(read('legal/tokushoho.html')).toContain('月額 300 円（税込）');
