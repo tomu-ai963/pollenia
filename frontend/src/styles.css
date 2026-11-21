@@ -486,3 +486,16 @@ button.like.active { background: var(--rose-ink); color: #fff; }
 }
 .follow-user:last-child { border-bottom: none; }
 .follow-user .meta { font-size: 0.74rem; color: var(--muted); }
+
+/* ページ下部の法務リンク（index.html・public.html） */
+.site-footer {
+  max-width: 720px;
+  margin: 24px auto 0;
+  padding: 16px 16px 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.site-footer a { color: var(--muted); }
