@@ -55,6 +55,8 @@ function renderPlan() {
   // 未加入・解約済みのときだけ加入ボタン・説明を出す。加入中はポータル導線を出す。
   show('btn-subscribe', !isSubscribed());
   show('plan-desc', !isSubscribed());
+  // 料金・規約の案内は申し込む前の人向け。加入中（解約予約を含む）は出さない。
+  show('plan-terms', !isSubscribed());
   show('btn-portal', isSubscribed());
 }
 
