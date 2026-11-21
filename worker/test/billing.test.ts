@@ -10,7 +10,7 @@ import {
   toStripeForm,
   verifyStripeWebhook,
 } from '../src/lib/stripe';
-import { dispatchWebhookEvent, handleCreatePortal } from '../src/routes/billing';
+import { dispatchWebhookEvent, endsAtPeriodEnd, handleCreatePortal } from '../src/routes/billing';
 import type { Env } from '../src/env';
 import type { AuthedUser } from '../src/lib/auth';
 
@@ -171,7 +171,7 @@ describe('dispatchWebhookEvent（5イベントのハンドラ）', () => {
     });
     expect(sql.calls).toHaveLength(1);
     expect(sql.calls[0].text).toContain('where stripe_customer_id =');
-    expect(sql.calls[0].values).toEqual(['past_due', SUBSCRIPTION, null, CUSTOMER]);
+    expect(sql.calls[0].values).toEqual(['past_due', SUBSCRIPTION, null, false, CUSTOMER]);
   });
 
   it('customer.subscription.updated → customer 未紐付けは metadata.uid でフォールバック', async () => {
@@ -200,6 +200,7 @@ describe('dispatchWebhookEvent（5イベントのハンドラ）', () => {
     expect(sql.calls[0].text).toContain("subscription_status = 'free'");
     expect(sql.calls[0].text).toContain('stripe_subscription_id = null');
     expect(sql.calls[0].text).toContain('current_period_end = null');
+    expect(sql.calls[0].text).toContain('cancel_at_period_end = false');
     expect(sql.calls[0].values).toEqual([CUSTOMER]);
   });
 
@@ -298,6 +299,7 @@ describe('dispatchWebhookEvent（5イベントのハンドラ）', () => {
       'active',
       SUBSCRIPTION,
       new Date(1_700_003_600 * 1000),
+      false, // 解約予約ではない（cancel_at なし）
       CUSTOMER,
     ]);
   });
@@ -320,6 +322,7 @@ describe('dispatchWebhookEvent（5イベントのハンドラ）', () => {
       'active',
       SUBSCRIPTION,
       new Date(1_700_007_200 * 1000),
+      false, // 解約予約ではない（cancel_at なし）
       CUSTOMER,
     ]);
   });
@@ -394,5 +397,53 @@ describe('requireActiveSubscription（AI 有料ゲート）', () => {
     const r = await requireActiveSubscription(sql, UID);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.response.status).toBe(402);
+  });
+});
+
+// 2026-11-21: Stripe の API 2026-11-18 では、カスタマーポータルで解約すると cancel_at_period_end は false のままで、
+// cancel_at に期間の終わりの日時が入る（TOMU GARDEN のテスト環境で実測。種日和の PR #42 と同じ）。
+// どちらの形でも「期間の終わりで終わる予定」として profiles.cancel_at_period_end に持つ。
+describe('解約予約（期間の終わりで終わる予定）', () => {
+  const END = 1_800_000_000;
+  const item = (end: number) => ({ items: { data: [{ current_period_end: end }] } });
+
+  it('endsAtPeriodEnd: cancel_at_period_end=true、または cancel_at が期間の終わり以前なら true', () => {
+    expect(endsAtPeriodEnd({ ...item(END), cancel_at_period_end: true })).toBe(true);
+    expect(endsAtPeriodEnd({ ...item(END), cancel_at_period_end: false, cancel_at: END })).toBe(true);
+    expect(endsAtPeriodEnd({ ...item(END), cancel_at_period_end: false, cancel_at: END - 60 })).toBe(true);
+    expect(endsAtPeriodEnd({ ...item(END), cancel_at_period_end: false, cancel_at: null })).toBe(false);
+    expect(endsAtPeriodEnd({ ...item(END) })).toBe(false);
+    // 期間の終わりより後: 今の期間末で一度更新されるので解約予約ではない
+    expect(endsAtPeriodEnd({ ...item(END), cancel_at: END + 15 * 86400 })).toBe(false);
+  });
+
+  it('customer.subscription.updated（ポータルで解約）→ cancel_at_period_end = true を保存', async () => {
+    const sql = makeFakeSql(() => [{ id: UID }]);
+    await dispatchWebhookEvent(sql, {
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: SUBSCRIPTION, customer: CUSTOMER, status: 'active',
+          cancel_at_period_end: false, cancel_at: END, ...item(END),
+        },
+      },
+    });
+    expect(sql.calls[0].text).toContain('cancel_at_period_end =');
+    expect(sql.calls[0].values).toEqual(['active', SUBSCRIPTION, new Date(END * 1000), true, CUSTOMER]);
+  });
+
+  it('metadata.uid のフォールバックでも同じ値を保存する', async () => {
+    const sql = makeFakeSql((text) => (text.includes('returning id') ? [] : [{ id: UID }]));
+    await dispatchWebhookEvent(sql, {
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: SUBSCRIPTION, customer: CUSTOMER, status: 'active', metadata: { uid: UID },
+          cancel_at_period_end: true, ...item(END),
+        },
+      },
+    });
+    expect(sql.calls[1].text).toContain('cancel_at_period_end =');
+    expect(sql.calls[1].values).toContain(true);
   });
 });
