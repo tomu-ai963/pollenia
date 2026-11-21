@@ -4,6 +4,7 @@ import { errorResponse } from '../lib/error-response';
 import type { AuthedUser } from '../lib/auth';
 import type { Env } from '../env';
 import type { PhotoSigner } from '../lib/photos';
+import { photoBodyError } from '../lib/jpeg';
 import { canViewWithDb, type Visibility } from '../lib/visibility';
 import { asDateStr, asText, asVisibility, clampIntParam, isUuid } from '../lib/validate';
 import { parsePlantTraits } from '../lib/traits';
@@ -266,6 +267,7 @@ export async function handleCreatePhoto(
 //   * 自分の行・未アップロード・個体が未削除のときだけ受け付ける（それ以外は 404）
 //   * Content-Type は行の拡張子から決まる値と一致すること（R2 にはその値を保存し、配信時もそれだけを使う）
 //   * 本文は PHOTO_MAX_BYTES まで（Content-Length と実際の長さの両方で確かめる）
+//   * 本文はメタデータ（位置情報など）を持たない JPEG であること（lib/jpeg.ts。直さずに拒否する）
 // uploaded_at の更新は「null のときだけ」の条件付き UPDATE で行い、同時 PUT でも 1 回に絞る
 // （R2 への put は条件付き UPDATE の後。失敗したら uploaded_at を戻して再試行できるようにする）。
 export async function handleUploadPhoto(
@@ -319,6 +321,12 @@ export async function handleUploadPhoto(
     return errorResponse('VALIDATION_ERROR', {
       publicMessage: `画像は 1 バイト以上 ${PHOTO_MAX_BYTES / 1024 / 1024}MB までです。`,
     });
+  }
+  // 位置情報（Exif の GPS）などのメタデータを持つ JPEG は保存しない（lib/jpeg.ts）。直さずに拒否する
+  const bodyError = photoBodyError(new Uint8Array(body));
+  if (bodyError) {
+    await release();
+    return errorResponse('VALIDATION_ERROR', { publicMessage: bodyError });
   }
 
   try {

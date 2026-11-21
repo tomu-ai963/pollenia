@@ -4,6 +4,7 @@ import { api, auth, ApiError } from './api.js';
 import { renderAncestors, renderDescendants } from './lineage-render.js';
 import { initCommunity, openMyProfile, loadCrossingOptions } from './community.js';
 import { initAi, resetListingUi } from './ai.js';
+import { reencodePhoto } from './photo-image.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -551,12 +552,14 @@ $('btn-upload-photo').onclick = async () => {
   const file = $('photo-file').files[0];
   if (!file) return setError('detail-error', new Error('ファイルを選択してください。'));
   try {
+    // 端末の中で描き直して JPEG にし、位置情報などのメタデータを落としてから送る（photo-image.js）
+    const jpeg = await reencodePhoto(file);
     const { upload } = await api.createPhoto(plantId, {
-      content_type: file.type,
+      content_type: 'image/jpeg',
       caption: $('photo-caption').value.trim() || undefined,
     });
     // Worker が返したアップロード先（PUT /api/photos/:id）へ本体を送る（R2 への保存は Worker が行う）
-    await api.uploadPhoto(upload, file);
+    await api.uploadPhoto(upload, jpeg);
     await openDetail(plantId);
   } catch (e) {
     setError('detail-error', e);
