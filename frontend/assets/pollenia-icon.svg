@@ -3,16 +3,21 @@
   <rect width="1024" height="1024" fill="#FFFFFF"/>
   <g transform="translate(0,30)" fill="none" stroke="#C9A227" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
 
-    <!-- wings: outline only, no fill (transparency) -->
+    <!-- wings: outline only, no fill (transparency); opened 15deg around the root -->
     <g stroke-width="10">
-      <ellipse cx="316" cy="314" rx="140" ry="56" transform="rotate(35 316 314)"/>
-      <ellipse cx="708" cy="314" rx="140" ry="56" transform="rotate(-35 708 314)"/>
-      <!-- venation -->
-      <g stroke-width="6.5" opacity="0.6">
-        <path d="M416 382 L224 248"/>
-        <path d="M427 356 L312 276"/>
-        <path d="M608 382 L800 248"/>
-        <path d="M597 356 L712 276"/>
+      <g transform="translate(-6,0) rotate(-15 431 394)">
+        <ellipse cx="316" cy="314" rx="140" ry="56" transform="rotate(35 316 314)"/>
+        <g stroke-width="6.5" opacity="0.6">
+          <path d="M416 382 L224 248"/>
+          <path d="M427 356 L312 276"/>
+        </g>
+      </g>
+      <g transform="translate(6,0) rotate(15 593 394)">
+        <ellipse cx="708" cy="314" rx="140" ry="56" transform="rotate(-35 708 314)"/>
+        <g stroke-width="6.5" opacity="0.6">
+          <path d="M608 382 L800 248"/>
+          <path d="M597 356 L712 276"/>
+        </g>
       </g>
     </g>
 
@@ -40,10 +45,16 @@
       <path d="M401 688 Q512 714 623 688"/>
     </g>
 
-    <!-- front legs -->
-    <g stroke-width="10">
-      <path d="M448 480 Q404 522 396 576"/>
-      <path d="M576 480 Q620 522 628 576"/>
+    <!-- front legs (reaching forward beside the head) -->
+    <g stroke-width="9">
+      <path d="M460 381 Q439 359 426 336 Q420 311 418 278"/>
+      <path d="M564 381 Q585 359 598 336 Q604 311 606 278"/>
+    </g>
+
+    <!-- middle legs -->
+    <g stroke-width="11">
+      <path d="M428 468 Q376 470 352 486 Q330 502 322 540"/>
+      <path d="M596 468 Q648 470 672 486 Q694 502 702 540"/>
     </g>
 
     <!-- hind legs -->
