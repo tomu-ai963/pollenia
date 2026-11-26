@@ -15,9 +15,6 @@
 | AI | Anthropic API（有料プランのみ） |
 | 課金 | Stripe（月額サブスク ¥300） |
 
-2026-10 に tomu-system の Supabase（`pollenia` スキーマの間借り・Supabase Auth・Storage）から
-切り出した。ユーザーがいなかったのでデータ移行はしていない。
-
 ## ディレクトリ構成
 
 ```
@@ -80,29 +77,18 @@ npm run typecheck && npm test
 5. secret: DEVICE_AUTH_SECRET / RESEND_API_KEY / MAIL_FROM / ANTHROPIC_API_KEY / OPENAI_API_KEY /
    STRIPE_*（SUCCESS/CANCEL/PORTAL_RETURN の URL は https://pollenia.tomu-ai.dev 基準）
 6. deploy（worker/ で実行）→ Custom Domain `pollenia.tomu-ai.dev` を付与
-7. Stripe の Webhook URL を https://pollenia.tomu-ai.dev/api/billing/webhook に変更
-8. 旧構成の片付け: tomu-system の `pollenia` スキーマ・`pollenia_worker` ロール・`pollenia-` バケット、
-   旧 Hyperdrive 設定（pollenia-db）、Pages プロジェクト pollenia、workers.dev
+7. Stripe の Webhook 送信先を https://pollenia.tomu-ai.dev/api/billing/webhook に設定（下の「Stripe」）
 ```
 
-2026-10-22 に 1〜8 を実施済み（Neon プロジェクト `delicate-bread-60834234`、Hyperdrive `pollenia-neon`、
-公開は https://pollenia.tomu-ai.dev のみ。workers.dev は `workers_dev = false` で停止）。
+### Stripe
 
-### Stripe（2026-11-21 に TOMU GARDEN アカウントへ移行）
-
-課金は Stripe アカウント **TOMU GARDEN**（`acct_1Ue80EEAa8UTpLiX`。種日和と共用、とむSYSTEM の `tomu_ai_dev` とは別）。
-
-| 項目 | 値 |
-|---|---|
-| 商品 | 「Pollenia 有料プラン」`prod_VfYN6EVz2udOO4`（明細書表記 `TOMUGARDEN POLLENIA`、metadata `app=pollenia`） |
-| 価格（secret `STRIPE_PRICE_ID`） | `price_1UeDH4EAa8UTpLiXYPZkIrEo`（¥300/月） |
-| Webhook（secret `STRIPE_WEBHOOK_SECRET`） | 送信先 `pollenia-billing` `we_1UeDIBEAa8UTpLiXnEShIwPi` → `https://pollenia.tomu-ai.dev/api/billing/webhook`、API `2026-11-18.endive`、6 イベント（`checkout.session.completed`・`customer.subscription.created/updated/deleted`・`invoice.paid`・`invoice.payment_failed`。`worker/src/routes/billing.ts` の `switch` とそろえる） |
-| 鍵（secret `STRIPE_SECRET_KEY`） | Pollenia 専用の鍵。権限は「重要な操作を除くフルアクセス」（呼ぶのは customers 作成・Checkout・Customer Portal だけ） |
-| Customer Portal | アカウントの既定設定を種日和と共用（期間末キャンセル・プラン切替なし） |
-
-`STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` / `STRIPE_PORTAL_RETURN_URL` は移行で変わっていない。
-API 2026-11-18 ではポータルの解約が `cancel_at` で届く（`cancel_at_period_end` は false のまま）ので、
-解約予約の判定は `endsAtPeriodEnd()` が両方を見る（0003）。
+- 商品・価格・Webhook・鍵は Stripe ダッシュボードで作り、ID は secret（`STRIPE_PRICE_ID` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_SECRET_KEY`）に入れる
+- 鍵は Pollenia 専用のものを使う（呼ぶのは customers 作成・Checkout・Customer Portal だけ）
+- Webhook の送信先は `https://pollenia.tomu-ai.dev/api/billing/webhook`。購読するのは 6 イベント
+  （`checkout.session.completed`・`customer.subscription.created/updated/deleted`・`invoice.paid`・`invoice.payment_failed`）で、
+  `worker/src/routes/billing.ts` の `switch` とそろえる
+- API 2026-11-18 以降はポータルの解約が `cancel_at` で届く（`cancel_at_period_end` は false のまま）ので、
+  解約予約の判定は `endsAtPeriodEnd()` が両方を見る（0003）
 
 ## 運用の掟
 
