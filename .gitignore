@@ -13,6 +13,9 @@ node_modules/
 *.key
 *.bak
 
+# === 運用メモ（本番の ID・実施記録。ローカル専用）===
+OPS.local.md
+
 # === Cloudflare Workers / wrangler ===
 .wrangler/
 **/.wrangler/
