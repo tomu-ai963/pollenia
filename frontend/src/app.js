@@ -6,11 +6,15 @@ import { initCommunity, openMyProfile, loadCrossingOptions } from './community.j
 import { initAi, resetListingUi } from './ai.js';
 import { reencodePhoto } from './photo-image.js';
 import { planLabel } from './plan-label.js';
+import { parsePlantParam, PLANT_PARAM } from './plant-link.js';
 
 const $ = (id) => document.getElementById(id);
 
 let plants = [];
 let me = null; // 自分の profile（subscription_status を含む）
+
+// QR ラベルの直リンク（/?plant=<id>）。ログイン手続きの間も失わないよう、読み込み時に取っておく。
+let pendingPlantId = parsePlantParam(location.search);
 
 // AI 機能を利用できるサブスク状態（Worker の SUBSCRIPTION_ENTITLED_STATUSES と揃える）。
 const ENTITLED = new Set(['active', 'past_due']);
@@ -103,6 +107,19 @@ function handleCheckoutReturn() {
   history.replaceState(null, '', location.pathname);
 }
 
+// QR ラベルから来たとき: 記録タブに切り替えて、その個体の詳細（撮影して記録）を開く。
+// 他人の個体・削除済みは API が 404 を返し、詳細カードにエラーが出るだけ。
+async function openPendingPlant() {
+  const id = pendingPlantId;
+  if (!id) return;
+  pendingPlantId = null;
+  const url = new URL(location.href);
+  url.searchParams.delete(PLANT_PARAM);
+  history.replaceState(null, '', url.pathname + url.search);
+  switchTab('records');
+  await openDetail(id);
+}
+
 // ---- 認証・登録 -----------------------------------------------------------
 // workers-auth deviceAuth（lib/auth.ts）。セッション・端末の Cookie は HttpOnly なので、
 // 「この端末は信頼済みか」は localStorage の目印で推測するだけ（外れていても PIN ログインが
@@ -185,6 +202,7 @@ async function refreshSession() {
     renderPlan();
     handleCheckoutReturn();
     await Promise.all([loadPlants(), loadCrossings()]);
+    await openPendingPlant();
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) {
       // 未ログイン。信頼済みの目印がある端末は PIN から、それ以外はメールから
@@ -500,10 +518,15 @@ async function openDetail(plantId) {
   show('detail-card', true);
   reveal($('detail-card'));
   setError('detail-error', null);
+  // 読み込みに失敗したとき、前に開いていた個体へ写真を保存しないよう先に外す
+  $('detail-card').dataset.plantId = '';
+  $('detail-title').textContent = '読み込み中…';
   try {
     const { plant, photos } = await api.getPlant(plantId);
     $('detail-title').textContent = `${plant.name}${plant.species ? `（${plant.species}）` : ''}`;
     $('detail-card').dataset.plantId = plant.id;
+    $('detail-label-link').href = `/labels?id=${encodeURIComponent(plant.id)}`;
+    show('quick-record-success', false);
     resetListingUi(); // 前に開いた個体の出品文を残さない
 
     const ph = $('detail-photos');
@@ -520,6 +543,13 @@ async function openDetail(plantId) {
     await loadLineage(plant.id, 'up');
     $('detail-card').scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
+    if (!$('detail-card').dataset.plantId) {
+      // 個体そのものが開けなかった（他人の個体・削除済みの QR など）。前の個体の表示を残さない
+      $('detail-title').textContent = '個体を開けませんでした';
+      $('detail-photos').replaceChildren();
+      $('lineage-tree').replaceChildren();
+      $('detail-card').scrollIntoView({ behavior: 'smooth' });
+    }
     setError('detail-error', e);
   }
 }
@@ -534,23 +564,55 @@ async function loadLineage(plantId, direction) {
 $('btn-lineage-up').onclick = () => loadLineage($('detail-card').dataset.plantId, 'up');
 $('btn-lineage-down').onclick = () => loadLineage($('detail-card').dataset.plantId, 'down');
 
+// 写真 1 枚を個体に保存する（行の作成 → 本体の PUT）。
+async function savePhoto(plantId, file, caption) {
+  // 端末の中で描き直して JPEG にし、位置情報などのメタデータを落としてから送る（photo-image.js）
+  const jpeg = await reencodePhoto(file);
+  const { upload } = await api.createPhoto(plantId, {
+    content_type: 'image/jpeg',
+    caption: caption || undefined,
+  });
+  // Worker が返したアップロード先（PUT /api/photos/:id）へ本体を送る（R2 への保存は Worker が行う）
+  await api.uploadPhoto(upload, jpeg);
+}
+
 $('btn-upload-photo').onclick = async () => {
   setError('detail-error', null);
   const plantId = $('detail-card').dataset.plantId;
   const file = $('photo-file').files[0];
+  if (!plantId) return setError('detail-error', new Error('個体を開き直してください。'));
   if (!file) return setError('detail-error', new Error('ファイルを選択してください。'));
   try {
-    // 端末の中で描き直して JPEG にし、位置情報などのメタデータを落としてから送る（photo-image.js）
-    const jpeg = await reencodePhoto(file);
-    const { upload } = await api.createPhoto(plantId, {
-      content_type: 'image/jpeg',
-      caption: $('photo-caption').value.trim() || undefined,
-    });
-    // Worker が返したアップロード先（PUT /api/photos/:id）へ本体を送る（R2 への保存は Worker が行う）
-    await api.uploadPhoto(upload, jpeg);
+    await savePhoto(plantId, file, $('photo-caption').value.trim());
     await openDetail(plantId);
   } catch (e) {
     setError('detail-error', e);
+  }
+};
+
+// 撮影して記録: 撮った時点で保存する（ボタンを押し直させない。手が汚れている現場向け）。
+$('photo-camera').onchange = async () => {
+  const input = $('photo-camera');
+  const file = input.files[0];
+  if (!file) return;
+  const plantId = $('detail-card').dataset.plantId;
+  setError('detail-error', null);
+  show('quick-record-success', false);
+  if (!plantId) {
+    input.value = '';
+    return setError('detail-error', new Error('個体を開き直してから撮影してください。'));
+  }
+  $('camera-button').classList.add('busy');
+  try {
+    await savePhoto(plantId, file, $('quick-caption').value.trim());
+    $('quick-caption').value = '';
+    await openDetail(plantId);
+    show('quick-record-success', true);
+  } catch (e) {
+    setError('detail-error', e);
+  } finally {
+    input.value = ''; // 同じ写真を選び直しても change が起きるように
+    $('camera-button').classList.remove('busy');
   }
 };
 

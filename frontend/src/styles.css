@@ -499,3 +499,61 @@ button.like.active { background: var(--rose-ink); color: #fff; }
   color: var(--muted);
 }
 .site-footer a { color: var(--muted); }
+
+/* 個体詳細の「撮影して記録」（QR ラベルから開いた現場向け。カメラ直起動の file input を label で包む） */
+.quick-record {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 0.4rem 0 0.8rem;
+}
+.quick-record input[type="file"] { display: none; }
+.quick-record .camera-button {
+  display: inline-block;
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--mint-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.quick-record .camera-button.busy { opacity: 0.5; pointer-events: none; }
+
+/* QR ラベル印刷（labels.html） */
+.label-picker-actions { margin: 0.4rem 0; }
+#label-plant-list label.check-inline { display: flex; margin: 0.2rem 0; }
+.label-sheet {
+  max-width: 720px;
+  margin: 16px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4mm;
+}
+.plant-label {
+  --qr: 30mm;
+  width: calc(var(--qr) + 4mm);
+  padding: 2mm;
+  border: 1px dashed #bbb; /* 切り取り線 */
+  background: #fff;
+  color: #000;
+  break-inside: avoid;
+  text-align: center;
+}
+.size-small .plant-label { --qr: 21mm; }
+.size-large .plant-label { --qr: 45mm; }
+.plant-label svg { width: var(--qr); height: var(--qr); display: block; }
+.plant-label-text { margin-top: 1mm; line-height: 1.2; overflow-wrap: anywhere; }
+.plant-label-text strong { display: block; font-size: 9pt; }
+.plant-label-text span { display: block; font-size: 7pt; }
+.size-small .plant-label-text strong { font-size: 7pt; }
+.size-small .plant-label-text span { font-size: 6pt; }
+
+@media print {
+  .no-print, .site-footer { display: none !important; }
+  .labels-page { background: #fff; }
+  .labels-page main { padding: 0; max-width: none; }
+  .label-sheet { max-width: none; margin: 0; padding: 0; }
+  .plant-label { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

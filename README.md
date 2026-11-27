@@ -46,6 +46,8 @@ pollenia/
     ├── _headers         # CSP などのレスポンスヘッダ
     ├── index.html
     ├── public.html      # 公開系統ページ（/public?id=...）
+    ├── labels.html      # QR ラベル印刷（/labels）。QR の中身は個体の直リンク /?plant=<id>
+    ├── vendor/          # 同梱ライブラリ（qrcode-generator 2.0.4・MIT。改行を変換しない）
     └── src/
 ```
 

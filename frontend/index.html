@@ -265,6 +265,9 @@
 
       <section class="card">
         <h2>個体一覧</h2>
+        <p class="notice">
+          <a href="/labels">QR ラベルを印刷</a> — 鉢や名札に貼ると、スマホで読み取るだけでその個体を開いて写真で記録できます。
+        </p>
         <div id="plant-list"></div>
       </section>
 
@@ -349,6 +352,16 @@
         <div class="card-head">
           <h2 id="detail-title"></h2>
           <button class="small ghost" id="btn-detail-close">✕ 閉じる</button>
+        </div>
+        <!-- 現場での記録: カメラを直接起動し、撮ったらそのまま保存する（QR ラベルから開いたとき向け） -->
+        <div class="quick-record">
+          <input id="quick-caption" maxlength="500" placeholder="一言メモ（任意・撮る前に入力）">
+          <label class="camera-button" id="camera-button">
+            <input type="file" id="photo-camera" accept="image/jpeg,image/png,image/webp" capture="environment">
+            📷 撮影して記録
+          </label>
+          <a class="small" id="detail-label-link" href="/labels">この個体の QR ラベル</a>
+          <span class="notice success hidden" id="quick-record-success">記録しました。</span>
         </div>
         <div class="photos" id="detail-photos"></div>
         <div class="row">

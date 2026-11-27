@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pollenia — QR ラベル印刷</title>
+  <link rel="icon" type="image/svg+xml" href="assets/pollenia-icon.svg">
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body class="labels-page">
+  <header class="no-print">
+    <h1>🌸 Pollenia</h1>
+    <div><a href="/">← 記録に戻る</a></div>
+  </header>
+
+  <main>
+    <section class="card no-print">
+      <h2>QR ラベルを印刷</h2>
+      <p class="notice">
+        鉢や名札に貼るラベルです。スマホのカメラで読み取ると、その個体の画面が開き、すぐに写真で記録できます。
+        個体の画面はログインが必要なので、他の人が読み取っても中身は見られません。
+      </p>
+      <div class="row">
+        <div>
+          <label>ラベルの大きさ</label>
+          <select id="label-size">
+            <option value="small">小（約 2.5cm・名札向け）</option>
+            <option value="medium" selected>中（約 3.5cm）</option>
+            <option value="large">大（約 5cm・鉢向け）</option>
+          </select>
+        </div>
+      </div>
+      <div class="label-picker-actions">
+        <button class="small ghost" id="btn-select-all">すべて選ぶ</button>
+        <button class="small ghost" id="btn-select-none">選択を外す</button>
+      </div>
+      <div id="label-plant-list"></div>
+      <button id="btn-print">印刷する</button>
+      <div class="error" id="labels-error"></div>
+    </section>
+
+    <div id="label-sheet" class="label-sheet size-medium"></div>
+  </main>
+
+  <script type="module" src="src/labels.js"></script>
+</body>
+</html>
