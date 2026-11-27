@@ -61,6 +61,28 @@ profiles ──┬─ plants ──────────┐
   （回/分・回/日）の count 元 + コスト把握。
 - どちらも RLS 有効・ポリシー無し（deny-all）を維持。PostgREST 非露出・Worker 経由のみ。
 
+## 次の作業（0004_next_tasks.sql）
+
+- 作業（採種・播種・発芽の確認）は別テーブルにせず、記録の状態から導く。次の記録を付ければ自然に消え、
+  作業と記録の二重管理にならない。
+- 足したのは任意の予定日（`crossings.expected_harvest_date` / `seed_harvests.planned_sowing_date` /
+  `sowings.expected_germination_date`）、種の使用期限（`seed_harvests.sow_by_date`）、
+  一覧から外した印（3表の `task_dismissed_at`。結実しなかった交配など。記録そのものは消さない）。
+
+## 公開ギャラリー（0005_gallery.sql）
+
+- `plants.in_gallery`（既定 false）。ギャラリーに並べると誰でもたどれるようになり、「URL を知る人だけ」の
+  public より公開の範囲が広がるため、個体ごとに本人が選ぶ。載る条件は visibility = public と組み合わせて
+  Worker が判定する（public でなくなれば in_gallery のままでも載らない）。
+
+## ジャンル・在庫・交換（0007_genre_seed_exchange.sql）
+
+- `plants.genre`: 入力する特性の項目を切り替えるだけ。項目の定義はコードの側（`frontend/src/trait-spec.js`）に置き、
+  traits は jsonb のまま（項目を足すのにマイグレーションが要らない）。
+- `seed_stocks`: 種・花粉の在庫。所有者のみ（visibility なし）。交配（自分の）に任意でつなげる。
+- 交換の希望は posts に `exchange_*` 列を足した（別テーブルにすると、コメント・いいね・公開範囲の判定を作り直すことになる）。
+  在庫は所有者のみなので、公開する内容は投稿へのコピー。在庫を消しても投稿は残る（`seed_stock_id` は set null）。
+
 ## 将来の拡張候補（今はやらない）
 
 - species マスタテーブル化・タグ

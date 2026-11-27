@@ -62,6 +62,8 @@ export const api = {
   register: (displayName) =>
     call('/api/profiles', { method: 'POST', body: { display_name: displayName } }),
   me: () => call('/api/me'),
+  // 自分の設定（いまは週1メールを受け取るか）
+  updateMe: (patch) => call('/api/me', { method: 'PATCH', body: patch }),
 
   // plants
   listPlants: () => call('/api/plants'),
@@ -86,6 +88,31 @@ export const api = {
     call(`/api/harvests/${harvestId}/sowings`, { method: 'POST', body: sowing }),
   updateSowing: (sowingId, patch) =>
     call(`/api/sowings/${sowingId}`, { method: 'PATCH', body: patch }),
+
+  // 形質の分離（有料）
+  segregation: () => call('/api/analytics/segregation'),
+
+  // 種・花粉の在庫（自分だけ）と交換の希望（投稿の一種）
+  seedStocks: () => call('/api/seed-stocks'),
+  createSeedStock: (stock) => call('/api/seed-stocks', { method: 'POST', body: stock }),
+  deleteSeedStock: (id) => call(`/api/seed-stocks/${enc(id)}`, { method: 'DELETE' }),
+  exchange: (type, offset = 0) => call(`/api/exchange?type=${type === 'want' ? 'want' : 'offer'}&offset=${Number(offset) || 0}`),
+  createExchange: (body) => call('/api/exchange', { method: 'POST', body }),
+  updateExchange: (postId, status) =>
+    call(`/api/exchange/${enc(postId)}`, { method: 'PATCH', body: { status } }),
+
+  // 過去の記録の取り込み（CSV を端末で読んだ行）。dryRun は内容の確認だけ
+  importPlants: (rows, dryRun) =>
+    call(`/api/import/plants${dryRun ? '?dry_run=1' : ''}`, { method: 'POST', body: { rows } }),
+
+  // 次の作業（記録の状態から Worker が導く）。kind は harvest / sow / germination
+  tasks: () => call('/api/tasks'),
+  updateTask: (kind, recordId, patch) =>
+    call(`/api/tasks/${enc(kind)}/${enc(recordId)}`, { method: 'PATCH', body: patch }),
+
+  // 発芽率の集計（交配ごとは無料・親ごとは有料プラン）
+  germination: () => call('/api/analytics/germination'),
+  germinationParents: () => call('/api/analytics/germination/parents'),
 
   // lineage
   lineage: (plantId, direction = 'up', depth = 5) =>
@@ -123,4 +150,5 @@ export const api = {
 
   // 公開ページ（認証不要）
   publicPlant: (plantId) => call(`/public/plants/${plantId}`),
+  gallery: (offset = 0) => call(`/public/gallery?offset=${Number(offset) || 0}`),
 };

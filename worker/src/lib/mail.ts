@@ -67,3 +67,48 @@ export function createMailer(env: Env, requestUrl: string): Mailer | null {
   if (!apiKey || !from) return null;
   return createResendMailer(apiKey, from);
 }
+
+// ---- 「次の作業」の週1メール（scheduled.ts） ------------------------------------
+
+export interface DigestMailer {
+  // 失敗は throw（MailSendError。宛先・本文は入れない）
+  send(to: string, message: { subject: string; text: string }, unsubscribeUrl: string): Promise<void>;
+}
+
+// Resend があればそれで送る。無ければ、MOCK_MAIL=1 のときだけログに件名と行数を出す（ローカル確認用）。
+// cron にはリクエストのホストが無いので、ログイン用の「localhost のときだけ」の判定は使えない。
+// 代わりに、ログには宛先も本文（個体名）も出さない（本番に MOCK_MAIL が紛れ込んでも記録が漏れない）。
+export function createDigestMailer(env: Env): DigestMailer | null {
+  const apiKey = env.RESEND_API_KEY?.trim();
+  const from = env.MAIL_FROM?.trim();
+  if (apiKey && from) {
+    return {
+      async send(to, { subject, text }, unsubscribeUrl) {
+        const res = await fetch(RESEND_ENDPOINT, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            from,
+            to: [to],
+            subject,
+            text,
+            // メールソフトの「配信停止」ボタン（RFC 8058 のワンクリック）
+            headers: {
+              'List-Unsubscribe': `<${unsubscribeUrl}>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+            },
+          }),
+        });
+        if (!res.ok) throw new MailSendError(res.status);
+      },
+    };
+  }
+  if (env.MOCK_MAIL === '1') {
+    return {
+      async send(_to, { subject, text }) {
+        console.log(`[MOCK_MAIL] task digest: ${subject}（${text.split('\n').length} 行）`);
+      },
+    };
+  }
+  return null;
+}

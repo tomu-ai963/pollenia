@@ -3,8 +3,13 @@ import type { PhotoSigner } from '../lib/photos';
 import { json } from '../lib/http';
 import { errorResponse } from '../lib/error-response';
 import { canView, type Visibility } from '../lib/visibility';
-import { isUuid } from '../lib/validate';
-import { PUBLIC_CACHE_SECONDS, PUBLIC_LINEAGE_DEPTH } from '../constants';
+import { clampIntParam, isUuid } from '../lib/validate';
+import {
+  GALLERY_MAX_OFFSET,
+  GALLERY_PAGE_SIZE,
+  PUBLIC_CACHE_SECONDS,
+  PUBLIC_LINEAGE_DEPTH,
+} from '../constants';
 import { buildLineage } from '../services/lineage';
 import { listPhotosWithUrls } from './plants';
 
@@ -56,6 +61,59 @@ export async function handlePublicPlant(
       ancestors,
       descendants,
     },
+    200,
+    { 'cache-control': `public, max-age=${PUBLIC_CACHE_SECONDS}` },
+  );
+}
+
+// GET /public/gallery?offset=N — 認証不要の公開ギャラリー（0005_gallery.sql）。
+// - 載るのは visibility = public かつ in_gallery（本人が選んだもの）かつ未削除で、写真が 1 枚以上ある個体だけ。
+//   SQL で絞ったうえで、匿名 viewer（null）の canView をもう一度通す（可視性判定の入口を lib/visibility.ts に揃える）
+// - 返すのは公開系統ページと同じ範囲（名前・属種・持ち主の表示名）と、最新の写真 1 枚の署名 URL だけ。
+//   notes・traits・user_id・origin_sowing_id は返さない（実生かどうかの真偽だけ）
+// - 1 ページ GALLERY_PAGE_SIZE 件、offset は GALLERY_MAX_OFFSET まで（深いページングで DB を回させない）
+export async function handlePublicGallery(
+  req: Request,
+  sql: Sql,
+  signPhotos: PhotoSigner,
+): Promise<Response> {
+  const url = new URL(req.url);
+  const offset = clampIntParam(url.searchParams.get('offset'), 0, GALLERY_MAX_OFFSET, 0);
+
+  const rows = await sql`
+    select p.id, p.user_id, p.name, p.species, p.visibility,
+           (p.origin_sowing_id is not null) as is_seedling,
+           pr.display_name as owner_name,
+           ph.storage_path, ph.created_at as photo_at
+    from pollenia.plants p
+    join pollenia.profiles pr on pr.id = p.user_id
+    join lateral (
+      select storage_path, created_at from pollenia.plant_photos
+      where plant_id = p.id and uploaded_at is not null
+      order by created_at desc
+      limit 1
+    ) ph on true
+    where p.visibility = 'public' and p.in_gallery and p.deleted_at is null
+    order by ph.created_at desc, p.id
+    limit ${GALLERY_PAGE_SIZE + 1} offset ${offset}
+  `;
+  const hasMore = rows.length > GALLERY_PAGE_SIZE;
+  const visible = rows
+    .slice(0, GALLERY_PAGE_SIZE)
+    .filter((r) => canView(null, { ownerId: r.user_id, visibility: r.visibility as Visibility }));
+
+  const urlByPath = visible.length ? await signPhotos(visible.map((r) => r.storage_path as string)) : new Map();
+  const items = visible.map((r) => ({
+    id: r.id,
+    name: r.name,
+    species: r.species,
+    is_seedling: r.is_seedling,
+    owner_name: r.owner_name,
+    photo_url: urlByPath.get(r.storage_path as string) ?? null,
+  }));
+
+  return json(
+    { items, next_offset: hasMore && offset + GALLERY_PAGE_SIZE <= GALLERY_MAX_OFFSET ? offset + GALLERY_PAGE_SIZE : null },
     200,
     { 'cache-control': `public, max-age=${PUBLIC_CACHE_SECONDS}` },
   );

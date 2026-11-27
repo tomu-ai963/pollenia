@@ -6,6 +6,7 @@
 //   - crossing の展開可否はバックエンド（F6）で判定済み。post.crossing が null の
 //     レスポンス（不可視 or 添付なし）では交配セクションを描画しない。
 import { api, ApiError } from './api.js';
+import { renderExchangeBox } from './exchange-view.js';
 
 const $ = (id) => document.getElementById(id);
 const PAGE_SIZE = 20;
@@ -124,7 +125,7 @@ async function loadMoreFeed() {
 
 // ---- 投稿の描画（フィード・プロフィール共用） --------------------------------
 
-function renderPost(post) {
+export function renderPost(post) {
   const el = document.createElement('article');
   el.className = 'post';
 
@@ -154,6 +155,8 @@ function renderPost(post) {
 
   // F6: crossing はバックエンドが可視と判定した場合のみ含まれる。null なら描画しない
   if (post.crossing) el.appendChild(renderCrossing(post.crossing));
+  // 交換の希望（譲ります・探しています）
+  if (post.exchange) el.appendChild(renderExchangeBox(post, post.user_id === ctx?.me?.id));
 
   const foot = document.createElement('div');
   foot.className = 'post-foot';

@@ -106,3 +106,25 @@ export const AI_MARKETPLACES = ['mercari', 'yahoo_auction'] as const;
 export type AiMarketplace = (typeof AI_MARKETPLACES)[number];
 // メルカリの商品名上限（プロンプトと出力クランプの両方で使う）。
 export const AI_LISTING_TITLE_MAX = 40;
+
+// ============================================================
+// 発芽率の集計（GET /api/analytics/germination*）
+// ============================================================
+
+// 集計に使う播種の上限（新しい順）。1ユーザーの記録量として十分大きく、1リクエストの負荷の上限にもなる。
+export const ANALYTICS_MAX_SOWINGS = 5000;
+
+// 「次の作業」（GET /api/tasks）で、種類（採種・播種・発芽の確認）ごとに返す上限（新しい記録から）。
+export const TASKS_MAX_PER_KIND = 200;
+
+// 公開ギャラリー（GET /public/gallery）。1 ページの件数と、たどれる offset の上限。
+export const GALLERY_PAGE_SIZE = 24;
+export const GALLERY_MAX_OFFSET = 480;
+
+// 「次の作業」の週1メール（scheduled.ts）。1 回の cron で処理する人数の上限（超えた分は翌日以降の再実行で）。
+export const DIGEST_MAX_PER_RUN = 300;
+// メール内のリンクの起点（cron にはリクエストが無いので固定。wrangler.toml の APP_ORIGIN が優先）
+export const APP_ORIGIN_DEFAULT = 'https://pollenia.tomu-ai.dev';
+
+// 種・花粉の交換の希望（GET /api/exchange）の 1 ページの件数。
+export const EXCHANGE_PAGE_SIZE = 20;

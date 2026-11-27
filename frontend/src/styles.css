@@ -499,3 +499,165 @@ button.like.active { background: var(--rose-ink); color: #fff; }
   color: var(--muted);
 }
 .site-footer a { color: var(--muted); }
+
+/* 個体詳細の「撮影して記録」（QR ラベルから開いた現場向け。カメラ直起動の file input を label で包む） */
+.quick-record {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 0.4rem 0 0.8rem;
+}
+.quick-record input[type="file"] { display: none; }
+.quick-record .camera-button {
+  display: inline-block;
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--mint-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.quick-record .camera-button.busy { opacity: 0.5; pointer-events: none; }
+
+/* QR ラベル印刷（labels.html） */
+.label-picker-actions { margin: 0.4rem 0; }
+#label-plant-list label.check-inline { display: flex; margin: 0.2rem 0; }
+.label-sheet {
+  max-width: 720px;
+  margin: 16px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4mm;
+}
+.plant-label {
+  --qr: 30mm;
+  width: calc(var(--qr) + 4mm);
+  padding: 2mm;
+  border: 1px dashed #bbb; /* 切り取り線 */
+  background: #fff;
+  color: #000;
+  break-inside: avoid;
+  text-align: center;
+}
+.size-small .plant-label { --qr: 21mm; }
+.size-large .plant-label { --qr: 45mm; }
+.plant-label svg { width: var(--qr); height: var(--qr); display: block; }
+.plant-label-text { margin-top: 1mm; line-height: 1.2; overflow-wrap: anywhere; }
+.plant-label-text strong { display: block; font-size: 9pt; }
+.plant-label-text span { display: block; font-size: 7pt; }
+.size-small .plant-label-text strong { font-size: 7pt; }
+.size-small .plant-label-text span { font-size: 6pt; }
+
+@media print {
+  .no-print, .site-footer { display: none !important; }
+  .labels-page { background: #fff; }
+  .labels-page main { padding: 0; max-width: none; }
+  .label-sheet { max-width: none; margin: 0; padding: 0; }
+  .plant-label { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* 発芽率の集計（記録タブ） */
+.germ-subhead { font-size: 0.95rem; margin: 1.2rem 0 0.2rem; }
+.germ-row { padding: 0.45rem 0; border-bottom: 1px solid var(--line-soft); }
+.germ-row:last-child { border-bottom: none; }
+.germ-head { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.9rem; }
+.germ-bar { height: 6px; margin: 0.3rem 0 0.2rem; border-radius: 999px; background: var(--line-soft); overflow: hidden; }
+.germ-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--mint-ink); }
+.germ-row .meta { font-size: 0.74rem; color: var(--muted); }
+
+/* 次の作業（記録タブの一番上） */
+.task-item {
+  padding: 0.6rem 0.2rem;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 3px solid transparent;
+  padding-left: 0.6rem;
+}
+.task-item:last-child { border-bottom: none; }
+.task-item.overdue { border-left-color: #d9534f; }
+.task-item.soon { border-left-color: var(--mint-ink); }
+.task-item strong { font-weight: 500; }
+.task-item .meta { font-size: 0.76rem; color: var(--muted); margin: 0.15rem 0 0.35rem; }
+.task-item.overdue .meta { color: #b94a48; }
+.task-controls { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; align-items: center; }
+.task-date { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; color: var(--muted); }
+.task-date input { width: auto; margin: 0; padding: 0.2rem 0.3rem; font-size: 0.8rem; }
+
+/* 系統カード画像（個体詳細） */
+.lineage-card-preview {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 0.6rem 0;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+}
+a.button-link {
+  display: inline-block;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--mint-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* 公開ギャラリー（gallery.html） */
+.gallery-grid {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.gallery-item {
+  display: block;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  color: var(--ink);
+  text-decoration: none;
+}
+.gallery-item img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
+.gallery-item-body { padding: 0.5rem 0.7rem 0.7rem; }
+.gallery-item-body strong { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.gallery-item-body .meta { font-size: 0.74rem; color: var(--muted); }
+/* :not(.hidden) — id の指定は .hidden より強いので、隠すときに display:block で上書きしない */
+#btn-gallery-more:not(.hidden) { display: block; margin: 16px auto; }
+#gallery-empty { text-align: center; }
+
+/* 過去の記録の取り込み（記録タブ） */
+#import-file { margin: 0.4rem 0; }
+.import-errors { margin: 0.4rem 0 0; padding-left: 1.2rem; color: #b94a48; font-size: 0.82rem; }
+
+/* 個体を開けなかったとき（他人の個体・削除済みの QR など）は、見出しとエラーだけを出す */
+#detail-card.load-failed > :not(.card-head):not(#detail-error) { display: none; }
+
+/* scrollIntoView で止まる位置を、上に固定されたヘッダーの下にする（見出しがヘッダーに隠れないように） */
+.card { scroll-margin-top: 80px; }
+
+/* 押せないボタンは見た目でも分かるように（これまでは押せるときと同じ見た目だった） */
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 形質の分離（記録タブ） */
+.seg-crossing { padding: 0.6rem 0; border-bottom: 1px solid var(--line-soft); }
+.seg-crossing:last-child { border-bottom: none; }
+.seg-crossing .meta { font-size: 0.76rem; color: var(--muted); }
+.seg-table { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.8rem; margin: 0.4rem 0 0; font-size: 0.86rem; }
+.seg-table dt { color: var(--muted); }
+.seg-table dd { margin: 0; }
+
+/* 種・花粉の在庫と交換 */
+.stock-item .meta.expired { color: #b94a48; }
+.offer-form { margin: 0 0 0.8rem; padding: 0.6rem 0.8rem; border-radius: 12px; background: var(--bg, #fdf8ec); }
+.success-text:empty { display: none; }
+.segmented { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0.6rem; }
+.segmented .active { background: var(--mint); color: var(--mint-ink); }
+.exchange-box { margin: 0.4rem 0; padding: 0.5rem 0.7rem; border-radius: 12px; background: var(--mint); }
+.exchange-box.want { background: #fbe3e8; }
+.exchange-box .meta { font-size: 0.76rem; color: var(--muted); }
+.exchange-status { margin-left: 0.5rem; font-size: 0.72rem; padding: 0.05rem 0.5rem; border-radius: 999px; background: #fff; }
+.exchange-status.closed { color: var(--muted); }

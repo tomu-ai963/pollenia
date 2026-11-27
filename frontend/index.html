@@ -66,6 +66,9 @@
       </div>
 
       <div class="error" id="auth-error"></div>
+      <p class="notice gallery-link">
+        <a href="/gallery">ログインせずに、みんなの育種ギャラリーを見る →</a>
+      </p>
     </section>
 
     <!-- Pollenia 初回登録（ログイン済みだが profiles 行がない状態） -->
@@ -144,6 +147,46 @@
           <div class="error" id="post-error"></div>
         </section>
 
+        <!-- 種・花粉の交換（投稿の一種）。やりとりはコメントで。取引・支払いはアプリの外 -->
+        <section class="card" id="exchange-card">
+          <h2>種・花粉の交換</h2>
+          <p class="notice">
+            譲りたい種・花粉は、記録タブの「種・花粉の在庫」から出せます。やりとりは各投稿のコメントでどうぞ（取引・送料のやりとりはアプリの外で行ってください）。
+          </p>
+          <div class="segmented">
+            <button class="small ghost active" id="btn-exchange-offer">譲ります</button>
+            <button class="small ghost" id="btn-exchange-want">探しています</button>
+            <button class="small" id="btn-want-open">＋ 探しているものを投稿</button>
+          </div>
+          <div id="want-form" class="hidden">
+            <div class="row">
+              <div>
+                <label for="want-label">探しているもの（必須）</label>
+                <input id="want-label" maxlength="200" placeholder="例: 青系のバラの花粉">
+              </div>
+              <div>
+                <label for="want-kind">種類</label>
+                <select id="want-kind">
+                  <option value="">どちらでも</option>
+                  <option value="seed">種</option>
+                  <option value="pollen">花粉</option>
+                </select>
+              </div>
+              <div>
+                <label for="want-species">属・種</label>
+                <input id="want-species" maxlength="200">
+              </div>
+            </div>
+            <label for="want-content">本文（必須）</label>
+            <textarea id="want-content" maxlength="5000"></textarea>
+            <button id="btn-want-create">投稿する（公開されます）</button>
+          </div>
+          <div id="exchange-list"></div>
+          <p class="notice hidden" id="exchange-empty">いまは受付中のものがありません。</p>
+          <button class="ghost hidden" id="btn-exchange-more">もっと見る</button>
+          <div class="error" id="exchange-error"></div>
+        </section>
+
         <section class="card">
           <h2>タイムライン</h2>
           <p class="notice">フォロー中のユーザーの投稿が新しい順に表示されます。</p>
@@ -191,6 +234,18 @@
 
       <!-- 記録（Phase 1） -->
       <div id="tab-records" class="hidden">
+      <!-- 次の作業: 交配→採種→播種→発芽の確認のうち、まだの作業（記録すると消える） -->
+      <section class="card" id="tasks-card">
+        <h2>次の作業</h2>
+        <p class="notice" id="tasks-summary"></p>
+        <label class="check-inline">
+          <input type="checkbox" id="task-digest">
+          <span>期日が 7 日以内の作業を、毎週月曜の朝にメールで受け取る（作業が無い週は届きません）</span>
+        </label>
+        <div id="task-list"></div>
+        <div class="error" id="tasks-error"></div>
+      </section>
+
       <!-- 個体 -->
       <section class="card">
         <h2>個体を登録</h2>
@@ -215,48 +270,16 @@
         <label>メモ</label>
         <textarea id="plant-notes"></textarea>
 
-        <!-- 特性（任意・Phase 3 育種相談AIが参照する構造化フィールド）。すべて空欄でよい。 -->
+        <div class="row">
+          <div>
+            <label for="plant-genre">ジャンル</label>
+            <select id="plant-genre"></select>
+          </div>
+        </div>
+        <!-- 特性（任意）。ジャンルに応じた項目を trait-form.js が作る（項目の定義は trait-spec.js） -->
         <details class="traits">
           <summary>特性（任意）</summary>
-          <div class="row">
-            <div>
-              <label>開花時期</label>
-              <select id="plant-bloom-season">
-                <option value="" selected>未選択</option>
-                <option value="spring">春</option>
-                <option value="early_summer">初夏</option>
-                <option value="summer">夏</option>
-                <option value="autumn">秋</option>
-                <option value="winter">冬</option>
-              </select>
-            </div>
-            <div>
-              <label>香りの強さ（0〜5）</label>
-              <select id="plant-fragrance-strength">
-                <option value="" selected>未選択</option>
-                <option value="0">0</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-              </select>
-            </div>
-            <div>
-              <label>香りの系統</label>
-              <input id="plant-fragrance-type" maxlength="200" placeholder="例: 柑橘系、バニラ系">
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <label>草丈（cm）</label>
-              <input id="plant-height-cm" type="number" min="0" step="0.1" inputmode="decimal">
-            </div>
-            <div>
-              <label>花のサイズ（cm）</label>
-              <input id="plant-flower-size-cm" type="number" min="0" step="0.1" inputmode="decimal">
-            </div>
-          </div>
+          <div class="row trait-fields" id="plant-traits"></div>
         </details>
 
         <button id="btn-create-plant">登録</button>
@@ -265,6 +288,9 @@
 
       <section class="card">
         <h2>個体一覧</h2>
+        <p class="notice">
+          <a href="/labels">QR ラベルを印刷</a> — 鉢や名札に貼ると、スマホで読み取るだけでその個体を開いて写真で記録できます。
+        </p>
         <div id="plant-list"></div>
       </section>
 
@@ -292,50 +318,22 @@
             </select>
           </div>
         </div>
+        <label class="check-inline">
+          <input type="checkbox" id="edit-plant-in-gallery">
+          <span>公開ギャラリーに載せる（公開範囲が public で、写真が 1 枚以上あるときだけ載ります。誰でもログインせずに見られます）</span>
+        </label>
         <label>メモ</label>
         <textarea id="edit-plant-notes"></textarea>
 
+        <div class="row">
+          <div>
+            <label for="edit-plant-genre">ジャンル</label>
+            <select id="edit-plant-genre"></select>
+          </div>
+        </div>
         <details class="traits">
           <summary>特性（任意）</summary>
-          <div class="row">
-            <div>
-              <label>開花時期</label>
-              <select id="edit-plant-bloom-season">
-                <option value="">未選択</option>
-                <option value="spring">春</option>
-                <option value="early_summer">初夏</option>
-                <option value="summer">夏</option>
-                <option value="autumn">秋</option>
-                <option value="winter">冬</option>
-              </select>
-            </div>
-            <div>
-              <label>香りの強さ（0〜5）</label>
-              <select id="edit-plant-fragrance-strength">
-                <option value="">未選択</option>
-                <option value="0">0</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-              </select>
-            </div>
-            <div>
-              <label>香りの系統</label>
-              <input id="edit-plant-fragrance-type" maxlength="200" placeholder="例: 柑橘系、バニラ系">
-            </div>
-          </div>
-          <div class="row">
-            <div>
-              <label>草丈（cm）</label>
-              <input id="edit-plant-height-cm" type="number" min="0" step="0.1" inputmode="decimal">
-            </div>
-            <div>
-              <label>花のサイズ（cm）</label>
-              <input id="edit-plant-flower-size-cm" type="number" min="0" step="0.1" inputmode="decimal">
-            </div>
-          </div>
+          <div class="row trait-fields" id="edit-plant-traits"></div>
         </details>
 
         <button id="btn-save-plant">保存</button>
@@ -350,6 +348,16 @@
           <h2 id="detail-title"></h2>
           <button class="small ghost" id="btn-detail-close">✕ 閉じる</button>
         </div>
+        <!-- 現場での記録: カメラを直接起動し、撮ったらそのまま保存する（QR ラベルから開いたとき向け） -->
+        <div class="quick-record">
+          <input id="quick-caption" maxlength="500" placeholder="一言メモ（任意・撮る前に入力）">
+          <label class="camera-button" id="camera-button">
+            <input type="file" id="photo-camera" accept="image/jpeg,image/png,image/webp" capture="environment">
+            📷 撮影して記録
+          </label>
+          <a class="small" id="detail-label-link" href="/labels">この個体の QR ラベル</a>
+          <span class="notice success hidden" id="quick-record-success">記録しました。</span>
+        </div>
         <div class="photos" id="detail-photos"></div>
         <div class="row">
           <div>
@@ -363,10 +371,43 @@
           </div>
         </div>
         <button id="btn-upload-photo">アップロード</button>
+        <!-- 写真のまとめ取り込み（SNS などから端末に保存した写真）。撮影日は写真の情報から取る -->
+        <details class="traits">
+          <summary>写真をまとめて追加（SNS などから保存した写真）</summary>
+          <p class="notice">
+            まとめて選んだ写真を、この個体の記録として追加します（一度に 30 枚まで）。撮影日は写真に残っている情報から取ります。
+            SNS から保存した写真は撮影日が消えていることが多いので、そのときは下の日付を使います。位置情報などは端末の中で取り除いてから保存します。
+          </p>
+          <div class="row">
+            <div>
+              <label for="bulk-photo-files">写真（複数選べます）</label>
+              <input type="file" id="bulk-photo-files" accept="image/jpeg,image/png,image/webp" multiple>
+            </div>
+            <div>
+              <label for="bulk-photo-date">撮影日が分からない写真の日付（任意）</label>
+              <input type="date" id="bulk-photo-date">
+            </div>
+          </div>
+          <button id="btn-bulk-photos">まとめて追加</button>
+          <span class="notice" id="bulk-photo-progress"></span>
+        </details>
         <h2 style="margin-top:1rem">系統樹</h2>
         <button class="small ghost" id="btn-lineage-up">⬆ 祖先（系譜）</button>
         <button class="small ghost" id="btn-lineage-down">⬇ 子孫（この個体から）</button>
         <div id="lineage-tree" style="margin-top:0.6rem"></div>
+
+        <!-- 系統カード画像（出品写真用）。端末内で描いて PNG を保存する。URL・QR は入れない -->
+        <h2 style="margin-top:1rem">系統カード画像</h2>
+        <p class="notice">
+          名前・写真・特性と、両親・祖父母の系統図を 1 枚の正方形の画像にします。フリマの商品写真にそのまま使えます。
+          出品先によっては外部サイトへの誘導が禁止されているため、URL や QR コードは入れていません。
+        </p>
+        <button id="btn-lineage-card">カードを作る</button>
+        <div id="lineage-card-result" class="hidden">
+          <img id="lineage-card-preview" class="lineage-card-preview" alt="系統カードのプレビュー">
+          <a class="button-link" id="lineage-card-download" download>画像を保存</a>
+        </div>
+        <div class="error" id="lineage-card-error"></div>
 
         <!-- 出品文自動生成（Phase 3）。生成結果は編集・コピー可能。自動投稿はしない。 -->
         <h2 style="margin-top:1rem">出品文を生成（AI）</h2>
@@ -427,6 +468,21 @@
         <div id="crossing-list"></div>
       </section>
 
+      <!-- 発芽率の集計。交配ごとは無料、親ごとの比較は有料プラン -->
+      <section class="card" id="germination-card">
+        <h2>発芽率</h2>
+        <p class="notice" id="germ-overall"></p>
+        <div id="germ-crossings"></div>
+        <h3 class="germ-subhead">親ごとの比較（有料プラン）</h3>
+        <p class="notice">同じ個体を母木・花粉親に使った交配をまとめて、どの親の種がよく発芽するかを比べます。</p>
+        <p class="notice hidden" id="germ-parents-locked">
+          有料プラン（¥300/月）でご利用いただけます。
+          <button class="small ghost" id="btn-germ-to-plan">プランを見る</button>
+        </p>
+        <div id="germ-parents"></div>
+        <div class="error" id="germ-error"></div>
+      </section>
+
       <!-- 交配記録を編集 -->
       <section class="card hidden" id="crossing-edit-card">
         <div class="card-head">
@@ -457,6 +513,87 @@
         <button class="ghost" id="btn-cancel-crossing-edit">キャンセル</button>
         <span class="notice success hidden" id="crossing-edit-success">保存しました。</span>
         <div class="error" id="crossing-edit-error"></div>
+      </section>
+      <!-- 形質の分離（有料）。交配から生まれた子の特性がどう分かれたか -->
+      <section class="card" id="segregation-card">
+        <h2>形質の分離（有料プラン）</h2>
+        <p class="notice">
+          交配ごとに、生まれた子（自家実生の個体）の特性がどう分かれたかを数えます。両親の特性と並べて、選抜の判断に使えます。
+          子の個体は、播種の記録から「自家実生」として登録したものが対象です。
+        </p>
+        <p class="notice hidden" id="seg-locked">
+          有料プラン（¥300/月）でご利用いただけます。
+          <button class="small ghost" id="btn-seg-to-plan">プランを見る</button>
+        </p>
+        <div id="seg-list"></div>
+        <p class="notice hidden" id="seg-empty">まだ子の個体が登録された交配がありません。</p>
+        <div class="error" id="seg-error"></div>
+      </section>
+
+      <!-- 種・花粉の在庫（自分だけ）。「交換に出す」と、その時点の内容だけが公開の投稿になる -->
+      <section class="card" id="stocks-card">
+        <h2>種・花粉の在庫</h2>
+        <p class="notice">使用期限の近い順に並びます。在庫は自分だけに見えます。「交換に出す」と、名前・種類・属種・期限と本文が公開されます。</p>
+        <p class="notice success-text" id="stocks-notice"></p>
+        <div id="stock-list"></div>
+        <p class="notice hidden" id="stocks-empty">在庫はまだありません。</p>
+        <details class="traits">
+          <summary>在庫を追加</summary>
+          <div class="row">
+            <div>
+              <label for="stock-kind">種類</label>
+              <select id="stock-kind">
+                <option value="seed" selected>種</option>
+                <option value="pollen">花粉</option>
+              </select>
+            </div>
+            <div>
+              <label for="stock-label">名前（必須）</label>
+              <input id="stock-label" maxlength="200" placeholder="例: ピンク実生×青の香り 2025">
+            </div>
+            <div>
+              <label for="stock-species">属・種</label>
+              <input id="stock-species" maxlength="200">
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="stock-quantity">数量（粒）</label>
+              <input id="stock-quantity" type="number" min="0" step="1" inputmode="numeric">
+            </div>
+            <div>
+              <label for="stock-collected">採取日</label>
+              <input id="stock-collected" type="date">
+            </div>
+            <div>
+              <label for="stock-use-by">使用期限</label>
+              <input id="stock-use-by" type="date">
+            </div>
+          </div>
+          <label for="stock-notes">メモ</label>
+          <textarea id="stock-notes"></textarea>
+          <button id="btn-add-stock">追加</button>
+        </details>
+        <div class="error" id="stocks-error"></div>
+      </section>
+
+      <!-- 過去の記録の取り込み（CSV）。内容を確認（dry run）してから取り込む -->
+      <section class="card" id="import-card">
+        <h2>過去の記録を取り込む（CSV）</h2>
+        <p class="notice">
+          Excel や紙のノートの記録を、1 行 1 個体の CSV にして取り込めます。母・父の欄に名前を書くと、系統としてつながります。
+          親がまだ登録されていなければ、その名前で導入株を作ります。取り込んだ個体はすべて非公開（private）です。
+        </p>
+        <p class="notice">
+          <a href="/assets/pollenia-import-template.csv" download>ひな形の CSV をダウンロード</a>
+          （父の欄は「不明」で父不明、「自家」で自家受粉。Excel で保存した CSV もそのまま読めます）
+        </p>
+        <input type="file" id="import-file" accept=".csv,text/csv">
+        <button class="ghost" id="btn-import-check">内容を確認</button>
+        <button id="btn-import-run" disabled>取り込む</button>
+        <div class="notice" id="import-summary"></div>
+        <ul class="import-errors" id="import-errors"></ul>
+        <div class="error" id="import-error"></div>
       </section>
       </div><!-- /tab-records -->
     </div>

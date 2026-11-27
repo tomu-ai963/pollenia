@@ -8,6 +8,7 @@ import { photoBodyError } from '../lib/jpeg';
 import { canViewWithDb, type Visibility } from '../lib/visibility';
 import { asDateStr, asText, asVisibility, clampIntParam, isUuid } from '../lib/validate';
 import { parsePlantTraits } from '../lib/traits';
+import { GENRES } from '../../../frontend/src/trait-spec.js';
 import {
   LIST_LIMIT_DEFAULT,
   LIST_LIMIT_MAX,
@@ -21,7 +22,7 @@ import {
 // 閲覧は所有者 + canViewWithDb（visibility 列に基づく共通判定。lib/visibility.ts）。
 
 const PLANT_COLS = `id, user_id, name, species, visibility, notes, traits,
-  origin_sowing_id, deleted_at, created_at, updated_at`;
+  origin_sowing_id, in_gallery, genre, deleted_at, created_at, updated_at`;
 
 // GET /api/plants — 自分の個体一覧（soft delete 済みは除く）。?limit&offset
 export async function handleListPlants(
@@ -63,7 +64,7 @@ export async function handleCreatePlant(
 
   const parsed = parseOptionalPlantFields(body);
   if (!parsed.ok) return parsed.response;
-  const { species, visibility, notes, traits, originSowingId } = parsed.value;
+  const { species, visibility, notes, traits, originSowingId, inGallery, genre } = parsed.value;
 
   if (originSowingId) {
     const own = await sql`
@@ -78,10 +79,10 @@ export async function handleCreatePlant(
   }
 
   const rows = await sql`
-    insert into pollenia.plants (user_id, name, species, visibility, notes, traits, origin_sowing_id)
+    insert into pollenia.plants (user_id, name, species, visibility, notes, traits, origin_sowing_id, in_gallery, genre)
     values (${user.uid}::uuid, ${name}, ${species}, ${visibility ?? 'private'},
             ${notes}, ${sql.json((traits ?? {}) as Record<string, string | number>)},
-            ${originSowingId ? sql`${originSowingId}::uuid` : null})
+            ${originSowingId ? sql`${originSowingId}::uuid` : null}, ${inGallery ?? false}, ${genre})
     returning ${sql.unsafe(PLANT_COLS)}
   `;
   return json({ plant: rows[0] }, 201);
@@ -128,6 +129,7 @@ export async function handleGetPlant(
       name: plant.name,
       species: plant.species,
       visibility: plant.visibility,
+      genre: plant.genre,
       traits: plant.traits,
       created_at: plant.created_at,
     },
@@ -135,7 +137,7 @@ export async function handleGetPlant(
   });
 }
 
-// PATCH /api/plants/:id — 所有者のみ。name / species / visibility / notes / origin_sowing_id
+// PATCH /api/plants/:id — 所有者のみ。name / species / visibility / notes / origin_sowing_id / in_gallery
 export async function handleUpdatePlant(
   req: Request,
   sql: Sql,
@@ -158,6 +160,8 @@ export async function handleUpdatePlant(
   if (body.species !== undefined) patch.species = parsed.value.species;
   if (body.visibility !== undefined) patch.visibility = parsed.value.visibility;
   if (body.notes !== undefined) patch.notes = parsed.value.notes;
+  if (body.in_gallery !== undefined) patch.in_gallery = parsed.value.inGallery;
+  if (body.genre !== undefined) patch.genre = parsed.value.genre;
   if (body.traits !== undefined) {
     // sql.json で渡す（traits を丸ごと置換）。JSON.stringify 済み文字列を ${...}::jsonb に
     // 渡すと postgres.js が再度 JSON エンコードして jsonb が「文字列」になり、
@@ -367,6 +371,10 @@ function parseOptionalPlantFields(body: Record<string, unknown>):
         notes: string | null;
         traits: Record<string, unknown> | null;
         originSowingId: string | null;
+        /** 公開ギャラリーに載せるか（未指定は null）。載るのは visibility = public のときだけ */
+        inGallery: boolean | null;
+        /** ジャンル（null = 未設定。入力する特性の項目が変わる。frontend/src/trait-spec.js） */
+        genre: string | null;
       };
     }
   | { ok: false; response: Response } {
@@ -424,5 +432,24 @@ function parseOptionalPlantFields(body: Record<string, unknown>):
     originSowingId = body.origin_sowing_id;
   }
 
-  return { ok: true, value: { species, visibility, notes, traits, originSowingId } };
+  let inGallery: boolean | null = null;
+  if (body.in_gallery !== undefined) {
+    if (typeof body.in_gallery !== 'boolean') {
+      return {
+        ok: false,
+        response: errorResponse('VALIDATION_ERROR', { publicMessage: 'in_gallery は true / false。' }),
+      };
+    }
+    inGallery = body.in_gallery;
+  }
+
+  let genre: string | null = null;
+  if (body.genre !== undefined && body.genre !== null) {
+    if (typeof body.genre !== 'string' || !GENRES.some((g) => g.value === body.genre)) {
+      return { ok: false, response: errorResponse('VALIDATION_ERROR', { publicMessage: 'genre が不正です。' }) };
+    }
+    genre = body.genre;
+  }
+
+  return { ok: true, value: { species, visibility, notes, traits, originSowingId, inGallery, genre } };
 }

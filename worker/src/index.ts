@@ -14,7 +14,7 @@ import {
   type AuthedUser,
 } from './lib/auth';
 import { createPhotoSigner, handleGetPhoto, type PhotoSigner } from './lib/photos';
-import { handleCreateProfile, handleGetMe } from './routes/profiles';
+import { handleCreateProfile, handleGetMe, handleUpdateMe } from './routes/profiles';
 import {
   handleCreatePhoto,
   handleCreatePlant,
@@ -34,7 +34,19 @@ import {
   handleUpdateSowing,
 } from './routes/records';
 import { handleGetLineage } from './routes/lineage';
-import { handlePublicPlant } from './routes/public';
+import { handlePublicGallery, handlePublicPlant } from './routes/public';
+import { handleGerminationByCrossing, handleGerminationByParent, handleSegregation } from './routes/analytics';
+import { handleListTasks, handleUpdateTask } from './routes/tasks';
+import { handleImportPlants } from './routes/import';
+import { handleUnsubscribe } from './routes/unsubscribe';
+import {
+  handleCreateSeedStock,
+  handleDeleteSeedStock,
+  handleListSeedStocks,
+  handleUpdateSeedStock,
+} from './routes/seed-stocks';
+import { handleCreateExchange, handleListExchange, handleUpdateExchange } from './routes/exchange';
+import { handleScheduled } from './scheduled';
 import {
   handleCreateComment,
   handleCreateLike,
@@ -61,6 +73,9 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //   認証不要
 //     - GET  /api/health                … ヘルスチェック
 //     - GET  /public/plants/:id         … 公開系統ページの API（p_viewer=null で RPC）
+//     - GET  /public/gallery            … 公開ギャラリー（public かつ本人が載せた個体。0005_gallery.sql）
+//     - GET/POST /public/unsubscribe    … 週1メールの配信停止（uid への HMAC 署名で確かめる。0006）
+//   cron（scheduled.ts）: 毎週月曜 8:00 JST に「次の作業」の週1メール
 //     - GET  /photos/:token             … 写真（Worker が署名した URL のみ。lib/photos.ts）
 //     - POST /api/billing/webhook       … Stripe Webhook（署名で真正性を担保）
 //   ログイン（workers-auth deviceAuth。lib/auth.ts）
@@ -68,7 +83,7 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //   セッションのみ（profiles 行を要求しない）
 //     - POST /api/profiles              … Pollenia への初回登録
 //   セッション + profiles 行（有効なセッション ≠ Pollenia ユーザー）
-//     - GET  /api/me
+//     - GET/PATCH /api/me（PATCH は設定: task_digest）
 //     - GET/POST /api/plants、GET/PATCH/DELETE /api/plants/:id
 //     - POST /api/plants/:id/photos     … 写真行の作成（アップロード先を返す）
 //     - PUT  /api/photos/:id            … 写真本体のアップロード（R2）
@@ -84,6 +99,17 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //     - POST /api/ai/consult、POST /api/ai/listing
 //   Phase 4（課金。Stripe 月額サブスク ¥300/月）
 //     - POST /api/billing/checkout、POST /api/billing/portal
+//   種・花粉の在庫（routes/seed-stocks.ts。所有者のみ）と交換の希望（routes/exchange.ts。投稿の一種）
+//     - GET/POST /api/seed-stocks、PATCH/DELETE /api/seed-stocks/:id
+//     - GET/POST /api/exchange、PATCH /api/exchange/:post_id（受付中・終了）
+//   過去の記録の取り込み（routes/import.ts）
+//     - POST /api/import/plants?dry_run=1   … CSV を画面で読んだ行（最大 500）。dry_run はプレビュー
+//   次の作業（routes/tasks.ts。記録の状態から導く）
+//     - GET  /api/tasks、PATCH /api/tasks/:kind/:id（予定日・種の使用期限・一覧から外す）
+//   発芽率の集計（routes/analytics.ts）
+//     - GET  /api/analytics/germination          … 交配ごと + 全体（無料）
+//     - GET  /api/analytics/germination/parents  … 親個体ごとの比較（有料ゲート）
+//     - GET  /api/analytics/segregation          … 交配ごとの形質の分離（有料ゲート）
 //
 // 状態を変えるメソッド（POST/PUT/PATCH/DELETE）は workers-auth の middleware が Origin と
 // CSRF 二重送信トークン（__Host-csrf Cookie ↔ x-csrf-token ヘッダ）を確かめる。
@@ -126,6 +152,10 @@ app.get('/api/health', () => json({ service: 'pollenia-worker', ok: true }));
 
 app.get('/photos/:token', (c) => handleGetPhoto(c.env, c.req.param('token')));
 
+app.on(['GET', 'POST'], '/public/unsubscribe', (c) => handleUnsubscribe(c.req.raw, c.env, c.var.sql));
+
+app.get('/public/gallery', (c) => handlePublicGallery(c.req.raw, c.var.sql, createPhotoSigner(c.env)));
+
 app.get('/public/plants/:id', (c) =>
   handlePublicPlant(c.var.sql, createPhotoSigner(c.env), c.req.param('id')),
 );
@@ -162,7 +192,11 @@ app.all('/api/*', async (c) => {
   return route(c.req.raw, c.env, sql, c.req.path, auth.value, createPhotoSigner(c.env));
 });
 
-export default app;
+// fetch は Hono、cron（[triggers] crons）は scheduled.ts
+export default {
+  fetch: app.fetch,
+  scheduled: (_event: ScheduledController, env: Env, ctx: ExecutionContext) => handleScheduled(env, ctx),
+} satisfies ExportedHandler<Env>;
 
 // /api/* のうち、セッション + profiles 行を要求するルート（ハンドラ実体は routes/）。
 async function route(
@@ -174,8 +208,9 @@ async function route(
   signPhotos: PhotoSigner,
 ): Promise<Response> {
   if (pathname === '/api/me') {
-    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
-    return handleGetMe(sql, user);
+    if (req.method === 'GET') return handleGetMe(sql, user);
+    if (req.method === 'PATCH') return handleUpdateMe(req, sql, user);
+    return errorResponse('METHOD_NOT_ALLOWED');
   }
 
   if (pathname === '/api/plants') {
@@ -244,6 +279,63 @@ async function route(
   }
 
   // --- Phase 3: AI -----------------------------------------------------------
+
+  if (pathname === '/api/seed-stocks') {
+    if (req.method === 'GET') return handleListSeedStocks(sql, user);
+    if (req.method === 'POST') return handleCreateSeedStock(req, sql, user);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  const seedStockById = pathname.match(/^\/api\/seed-stocks\/([^/]+)$/);
+  if (seedStockById) {
+    const id = decodeURIComponent(seedStockById[1]);
+    if (req.method === 'PATCH') return handleUpdateSeedStock(req, sql, user, id);
+    if (req.method === 'DELETE') return handleDeleteSeedStock(sql, user, id);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  if (pathname === '/api/exchange') {
+    if (req.method === 'GET') return handleListExchange(req, sql, user);
+    if (req.method === 'POST') return handleCreateExchange(req, sql, user);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  const exchangeById = pathname.match(/^\/api\/exchange\/([^/]+)$/);
+  if (exchangeById) {
+    if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleUpdateExchange(req, sql, user, decodeURIComponent(exchangeById[1]));
+  }
+
+  if (pathname === '/api/import/plants') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleImportPlants(req, sql, user);
+  }
+
+  if (pathname === '/api/tasks') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleListTasks(sql, user);
+  }
+
+  const taskById = pathname.match(/^\/api\/tasks\/([^/]+)\/([^/]+)$/);
+  if (taskById) {
+    if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleUpdateTask(req, sql, user, decodeURIComponent(taskById[1]), decodeURIComponent(taskById[2]));
+  }
+
+  if (pathname === '/api/analytics/segregation') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleSegregation(sql, user);
+  }
+
+  if (pathname === '/api/analytics/germination') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleGerminationByCrossing(sql, user);
+  }
+
+  if (pathname === '/api/analytics/germination/parents') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleGerminationByParent(sql, user);
+  }
 
   if (pathname === '/api/ai/consult') {
     if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');

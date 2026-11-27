@@ -38,6 +38,7 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
 | PATCH | /api/sowings/:id | 発芽数・日付の更新 |
 | GET | /api/plants/:id/lineage?direction=up\|down&depth=N | 系統樹（下記「系統樹エンドポイント」参照） |
 | GET | /public/plants/:id | 公開系統ページ用（認証不要、下記参照） |
+| GET | /public/gallery?offset=N | 公開ギャラリー（認証不要。下記「公開ギャラリー」） |
 
 ### 系統樹エンドポイント（重要：viewer の扱い）
 
@@ -145,7 +146,93 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
   判定は advisory lock でユーザー単位に直列化した「insert → 自分を含めた count」の順
   （Opus 4.8 レビュー M1: check-then-insert の TOCTOU で並行リクエストがすり抜けるのを防ぐ）。
   429 になった試行もイベントとして残る。
-- 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）、
-  /api/analytics/germination（発芽率グラフ）。
+- 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）。
+
+## 公開ギャラリー（routes/public.ts の handlePublicGallery。認証不要）
+
+- 画面は `/gallery`（ログイン画面と公開系統ページから入れる）。
+- 載るのは visibility = public **かつ本人が `in_gallery` を選んだ**未削除の個体で、写真が 1 枚以上あるものだけ
+  （0005_gallery.sql。URL を知る人だけが見られる public より範囲が広いので、既定は載せない）。
+  `in_gallery` は `POST/PATCH /api/plants` で設定し、所有者向けの応答にだけ含まれる。
+- 返す項目: `id, name, species, is_seedling, owner_name, photo_url`（最新写真 1 枚の署名 URL）。
+  公開系統ページと同じ範囲で、notes・traits・user_id は返さない。SQL で絞った後も `canView(null, …)` を通す。
+- 新しい写真の順に `GALLERY_PAGE_SIZE` 件ずつ。offset は `GALLERY_MAX_OFFSET` でクランプし、
+  次のページがあれば `next_offset`。`Cache-Control: public, max-age=60`（公開系統ページと同じ）。
+
+## ジャンル・形質の分離・種と花粉の在庫と交換・写真のまとめ取り込み（0007）
+
+- **ジャンル**: `plants.genre`（rose / hellebore / succulent / vegetable / other。null = 未設定）。
+  特性の項目は `frontend/src/trait-spec.js`（画面と Worker が共有。`lib/traits.ts` の検証・AI の文・系統カード・
+  CSV 取り込み・形質の分離がすべてここから作る）。ジャンルと項目の組み合わせは縛らない（ジャンルを変えても値は消さない）。
+- **形質の分離**（有料）: `GET /api/analytics/segregation`。交配ごとに子（`origin_sowing_id` でつながる自分の未削除の個体）の
+  特性を数える（選択肢・文字は値ごとの本数、数値は最小・最大・平均）。両親の特性も添える。
+- **種・花粉の在庫**（所有者のみ）: `GET/POST /api/seed-stocks`、`PATCH/DELETE /api/seed-stocks/:id`。
+- **交換の希望**（投稿の一種・public）: `GET /api/exchange?type=offer|want`、`POST /api/exchange`、
+  `PATCH /api/exchange/:post_id`（受付中・終了。本人だけ）。「譲ります」は本人の在庫から作り、その時点の内容をコピーする。
+  `confirm_variety: true`（種苗法の確認）が必須。期限切れ・数量 0 の在庫は出せない。やりとりは投稿のコメントで。
+- **写真のまとめ取り込み**: 画面だけ（既存の `POST /api/plants/:id/photos` を 1 枚ずつ）。撮影日は Exif（`frontend/src/exif-date.js`）、
+  無ければ指定の日付を `taken_at` に。
+
+## 過去の記録の取り込み（routes/import.ts。セッション + profiles 行を要求）
+
+| Method | Path | 内容 |
+|---|---|---|
+| POST | /api/import/plants?dry_run=1 | `{ rows: [...] }`（最大 500 行）。dry_run は書き込まずに作るものを返す |
+
+- CSV の読み取り（UTF-8 / Shift_JIS、見出しの揺れ）は画面（`frontend/src/csv-import.js`）で行い、
+  行を JSON で送る。検証と作成は Worker（`lib/import-plan.ts` が計画、ルートが 1 トランザクションで作成）。
+- 1 行 = 1 個体。項目: `name`（必須）, `species`, `mother`, `father`, `cross_date`, `notes`, 特性 5 項目。
+  ひな形は `frontend/assets/pollenia-import-template.csv`。
+- 親の名前は CSV の行 → 自分の登録済みの未削除の個体（1 件に決まるとき）→ どちらにも無ければ導入株を自動で作る。
+  父の欄は空・「不明」で父不明、「自家」か母と同じ名前で自家受粉。同じ母・父・交配日の行は 1 つの交配にまとめる。
+- 交配 → 採種 → 播種 → 子（`origin_sowing_id`）を作って系統をつなぐ。系統のために作る採種・播種は
+  `task_dismissed_at` を立て、「次の作業」にも発芽率の「未記録」にも出さない。
+- 作る個体はすべて private・ギャラリーに載せない。登録済みと同じ名前の行・CSV 内の重複・親子の輪はエラー（422 で行ごと）。
+  エラー文言に入力値は入れない。
+
+## 次の作業（routes/tasks.ts。すべてセッション + profiles 行を要求）
+
+| Method | Path | 内容 |
+|---|---|---|
+| GET | /api/tasks | まだの作業の一覧 |
+| PATCH | /api/tasks/:kind/:id | `{ due_date?, sow_by_date?, dismissed? }` 予定日・種の使用期限（sow のみ）・一覧から外す / 戻す |
+
+- 作業は別テーブルに持たず、記録の状態から導く（0004_next_tasks.sql）:
+  `harvest`（交配して採種がまだ。id = crossings.id）/ `sow`（採種して播種がまだ。id = seed_harvests.id）/
+  `germination`（播種して発芽数が未記録。id = sowings.id）。次の記録を付ければ作業は消える。
+- 期日 = 予定日と種の使用期限のうち早いほう。期日のあるものを早い順に先へ、期日なしは起点の日
+  （交配日・採種日・播種日）が古い順に後ろへ。期日を過ぎたかは利用者の暦で決まるので画面側で判定する。
+- 表は kind から固定の文字列で選び、すべてのクエリを検証済み uid で絞る（他人の記録・kind と合わない id は 404）。
+- 画面は記録タブの一番上と、タブの「記録（期日を過ぎた件数）」。
+
+### 週1メール（scheduled.ts・0006_task_digest.sql）
+
+| Method | Path | 内容 |
+|---|---|---|
+| PATCH | /api/me | `{ task_digest: boolean }` 受け取るか（既定 false）。GET /api/me にも含める |
+| GET / POST | /public/unsubscribe?u=&t= | 配信停止（認証不要。uid への HMAC 署名で本人を確かめる） |
+
+- cron（`[triggers] crons = ["0 23 * * 0"]` = 毎週月曜 8:00 JST）。task_digest の人のうち今日（JST）まだの人に、
+  期日が 7 日以内（過ぎたものを含む）の作業があれば送る。無ければ送らない。`task_digest_last_sent_on` で同じ日に二重に送らない。
+- 配信停止: GET は確認ページだけ（リンクの先読みで止まらない）、POST で止める。`List-Unsubscribe` /
+  `List-Unsubscribe-Post`（RFC 8058 のワンクリック）を付ける。署名の鍵は DEVICE_AUTH_SECRET から HKDF で用途別に派生。
+- ログに宛先・本文を出さない。ローカルは `npm run dev -- --test-scheduled` → `curl "http://localhost:8787/__scheduled?cron=0+23+*+*+0"`
+  （MOCK_MAIL=1 なら件名と行数だけログに出る）。
+
+## 発芽率の集計（routes/analytics.ts。すべてセッション + profiles 行を要求）
+
+| Method | Path | 内容 |
+|---|---|---|
+| GET | /api/analytics/germination | 交配ごとの発芽率と全体の合計（**無料**） |
+| GET | /api/analytics/germination/parents | 親個体ごとの比較（母木として / 花粉親として。**有料**・未加入は 402） |
+
+- 元データは自分の sowings（→ seed_harvests → crossings）のみ。3表とも検証済み uid で絞る。
+  新しい播種から `ANALYTICS_MAX_SOWINGS` 件まで。
+- 集計 1 件の形: `{ sowings, pending_sowings, sown, germinated, rate, avg_days_to_germination }`。
+  発芽率に入れるのは「播種数 > 0 かつ発芽数が記録済み」の播種だけ（未記録は `pending_sowings`。
+  0 発芽として数えない）。発芽数が播種数を超える入力は播種数で頭打ち。記録が無ければ `rate: null`。
+- 発芽までの日数は `first_germination_date - sowing_date`（0 日以上のものの平均）。
+- 親ごと: 父不明の交配は母木側だけ、自家受粉は母木・花粉親の両方に入る。
+- 画面は記録タブの「発芽率」カード。発芽数は交配記録一覧の「発芽を記録」（`PATCH /api/sowings/:id`）で入れる。
 
 エラーレスポンス・HTTP ヘルパーは knowledge-rag の `lib/http.ts` / `lib/error-response.ts` の形式を踏襲する。

@@ -23,7 +23,16 @@ const env = {
   ...process.env,
   CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: process.env.DATABASE_URL,
 };
-const child = spawn('npx', ['wrangler', 'dev', '--local', ...process.argv.slice(2)], {
+// wrangler.toml の routes（custom_domain）があると、wrangler dev は request.url のホストを
+// 本番ドメインに書き換える。すると MOCK_MAIL の「ローカルからのリクエストか」の判定
+// （src/lib/mail.ts）に当たらず、ログインが 503 になる。ローカルのホストを上流として渡す。
+const args = process.argv.slice(2);
+if (!args.some((a) => a.startsWith('--local-upstream'))) {
+  const portIdx = args.findIndex((a) => a === '--port' || a.startsWith('--port='));
+  const port = portIdx < 0 ? '8787' : args[portIdx].includes('=') ? args[portIdx].split('=')[1] : args[portIdx + 1];
+  args.push('--local-upstream', `localhost:${port}`);
+}
+const child = spawn('npx', ['wrangler', 'dev', '--local', ...args], {
   cwd: workerDir,
   env,
   stdio: 'inherit',

@@ -1,5 +1,6 @@
 import { uuidArrayLiteral, type Sql } from '../db';
-import { AI_CHUNK_NOTES_MAX, AI_SYNC_MAX_ROWS_PER_TABLE, BLOOM_SEASONS } from '../../constants';
+import { AI_CHUNK_NOTES_MAX, AI_SYNC_MAX_ROWS_PER_TABLE } from '../../constants';
+import { traitEntries } from '../../../../frontend/src/trait-spec.js';
 
 // 育種相談AI / 出品文生成の参照データ（RAG チャンク）の組み立て。
 //
@@ -29,28 +30,12 @@ export interface AiOverview {
 
 // --- 純粋な整形関数（vitest 対象） ------------------------------------------
 
-const BLOOM_SEASON_JP: Record<string, string> = {
-  spring: '春',
-  early_summer: '初夏',
-  summer: '夏',
-  autumn: '秋',
-  winter: '冬',
-};
-
-// traits（構造化特性）を日本語ラベルの1行に整形。未知キーは無視（lib/traits.ts で
-// 既知キーのみ保存される前提だが、過去データ・手動投入に対する防御）。
+// traits（構造化特性）を日本語ラベルの1行に整形（項目の定義は frontend/src/trait-spec.js）。
+// 未知キー・定義に合わない値は出さない（lib/traits.ts で既知キーのみ保存される前提だが、
+// 過去データ・手動投入に対する防御。プロンプトに不定形の文字列を混ぜない）。
 export function formatTraits(traits: unknown): string | null {
-  if (!traits || typeof traits !== 'object' || Array.isArray(traits)) return null;
-  const t = traits as Record<string, unknown>;
-  const parts: string[] = [];
-  if (typeof t.bloom_season === 'string' && (BLOOM_SEASONS as readonly string[]).includes(t.bloom_season)) {
-    parts.push(`開花期=${BLOOM_SEASON_JP[t.bloom_season] ?? t.bloom_season}`);
-  }
-  if (typeof t.fragrance_strength === 'number') parts.push(`香りの強さ=${t.fragrance_strength}/5`);
-  if (typeof t.fragrance_type === 'string') parts.push(`香りの系統=${t.fragrance_type}`);
-  if (typeof t.plant_height_cm === 'number') parts.push(`草丈=${t.plant_height_cm}cm`);
-  if (typeof t.flower_size_cm === 'number') parts.push(`花のサイズ=${t.flower_size_cm}cm`);
-  return parts.length ? parts.join(', ') : null;
+  const entries = traitEntries(traits);
+  return entries.length ? entries.map((e) => `${e.label}=${e.text}`).join(', ') : null;
 }
 
 // notes の切り詰め（プロンプトの暴発防止）。
