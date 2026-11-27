@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildJsonLd, buildLlms, buildRobots, checkConfig, type GeoConfig } from '../../geo/geo-lib.mjs';
+import { VERSION, buildJsonLd, buildLlms, buildRobots, checkConfig, type GeoConfig } from '../../geo/geo-lib.mjs';
 import { htmlCandidates, planFiles, syncFiles } from '../../geo/geo-build.mjs';
 
 // AI 検索向けの説明（geo/。geo-kit のコピーで、手を入れない）。`npm run geo` が frontend/ に書き込む。
@@ -17,6 +17,11 @@ const plan = () =>
   planFiles(config, { outDir: path('.'), inject: true, headers: path('_headers') });
 
 describe('GEO（AI 検索向けの説明）', () => {
+  // geo/ は geo-kit のコピー。kit を差し替えたら、ここも kit の package.json の version に合わせる
+  it('geo/ は geo-kit 1.0.0 のコピー', () => {
+    expect(VERSION).toBe('1.0.0');
+  });
+
   it('設定に必須項目の抜けもサンプル文の残りもない', () => {
     expect(checkConfig(config)).toEqual({ errors: [], warnings: [] });
   });
