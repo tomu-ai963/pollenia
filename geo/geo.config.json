@@ -12,8 +12,19 @@
   "app": {
     "category": "LifestyleApplication",
     "os": "Web",
-    "price": "0",
-    "priceCurrency": "JPY"
+    "offers": [
+      {
+        "name": "無料プラン",
+        "price": "0",
+        "description": "記録・系統樹・QR ラベル・次の作業・交配ごとの発芽率・系統カード・ギャラリー・コミュニティ"
+      },
+      {
+        "name": "有料プラン",
+        "price": "300",
+        "period": "month",
+        "description": "税込。AI による育種の相談と出品文の作成、親ごとの発芽率の比較、形質の分離の集計"
+      }
+    ]
   },
   "pages": [
     {
@@ -100,13 +111,37 @@
       "a": "はい。「AI相談」タブの「プラン」にある「お支払いの管理」から解約できます。解約しても、お支払い済みの期間が終わるまでは有料プランを使えます。"
     }
   ],
-  "intro": [
-    "交配・採種・播種・発芽を記録すると、両親や祖父母までの系統樹が自動でつながります。",
-    "記録・系統樹・コミュニティは無料です。AI による育種の相談や出品文の作成などは、有料プラン（月額 300 円・税込）で使えます。",
-    "記録と写真は、はじめは非公開です。公開にした株だけを、系統ページとギャラリーで見てもらえます。"
-  ],
+  "body": {
+    "lead": true,
+    "items": [
+      "交配・採種・播種・発芽を記録すると、両親や祖父母までの系統樹が自動でつながります。",
+      "記録・系統樹・コミュニティは無料です。AI による育種の相談や出品文の作成などは、有料プラン（月額 300 円・税込）で使えます。",
+      "記録と写真は、はじめは非公開です。公開にした株だけを、系統ページとギャラリーで見てもらえます。"
+    ],
+    "classes": {
+      "root": "intro",
+      "lead": "intro-lead",
+      "list": "intro-list"
+    }
+  },
   "aiCrawlers": {
-    "allow": ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "Claude-User", "PerplexityBot", "Google-Extended", "Applebot-Extended"],
-    "disallowPaths": ["/api/", "/auth/", "/photos/", "/public/", "/labels"]
+    "allow": [
+      "GPTBot",
+      "OAI-SearchBot",
+      "ChatGPT-User",
+      "ClaudeBot",
+      "Claude-SearchBot",
+      "Claude-User",
+      "PerplexityBot",
+      "Google-Extended",
+      "Applebot-Extended"
+    ],
+    "disallowPaths": [
+      "/api/",
+      "/auth/",
+      "/photos/",
+      "/public/",
+      "/labels"
+    ]
   }
 }

@@ -21,6 +21,47 @@ export function findPage(c, pathname) {
   return c.pages.find((p) => normPath(p.path) === n);
 }
 
+// ---- 料金（app.offers） ----
+// period: 継続課金の単位。JSON-LD では UnitPriceSpecification（billingDuration）、llms.txt では「月額」などで書く
+const PRICE = /^\d+(\.\d+)?$/;
+const PERIODS = {
+  month: { duration: "P1M", unit: "MON", ja: "月額", en: "month" },
+  year: { duration: "P1Y", unit: "ANN", ja: "年額", en: "year" },
+};
+
+function priceText(c, o) {
+  const cur = o.priceCurrency ?? c.app?.priceCurrency ?? "JPY";
+  const p = PERIODS[o.period];
+  if (c.lang === "ja") {
+    if (Number(o.price) === 0) return "無料";
+    const amount = cur === "JPY" ? `${Number(o.price).toLocaleString("ja-JP")} 円` : `${o.price} ${cur}`;
+    return p ? `${p.ja} ${amount}` : amount;
+  }
+  if (Number(o.price) === 0) return "Free";
+  return `${o.price} ${cur}${p ? ` / ${p.en}` : ""}`;
+}
+
+function offerLd(c, o) {
+  const priceCurrency = o.priceCurrency ?? c.app?.priceCurrency ?? "JPY";
+  const p = PERIODS[o.period];
+  return {
+    "@type": "Offer",
+    ...(o.name && { name: o.name }),
+    price: String(o.price),
+    priceCurrency,
+    ...(o.description && { description: o.description }),
+    ...(p && {
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        price: String(o.price),
+        priceCurrency,
+        billingDuration: p.duration,
+        unitCode: p.unit,
+      },
+    }),
+  };
+}
+
 // ---- 設定チェック ----
 // errors: 生成できない（必須項目の欠落） / warnings: 生成はできるがサンプル値や不足がある
 const SAMPLES = {
@@ -53,6 +94,21 @@ export function checkConfig(c) {
   if (SAMPLES.text.test([...(c.features ?? []), ...(c.faq ?? []).map((f) => f.a)].join("\n")))
     warnings.push("features / faq にサンプル文が残っています");
   if (!c.ogImage) warnings.push("ogImage が未設定です（SNS・検索結果で画像が出ません）");
+  if (c.app?.offers != null) {
+    if (!Array.isArray(c.app.offers) || c.app.offers.length === 0) errors.push("app.offers は1件以上の配列にしてください");
+    else
+      c.app.offers.forEach((o, i) => {
+        if (!o?.name) errors.push(`app.offers[${i}].name が未設定です`);
+        if (!PRICE.test(String(o?.price ?? ""))) errors.push(`app.offers[${i}].price は "300" のような数字で書いてください`);
+        if (o?.period != null && !PERIODS[o.period]) errors.push(`app.offers[${i}].period は "month" か "year" です`);
+      });
+    if (c.app.price != null) warnings.push("app.price は app.offers があるので使われません（どちらか一方に）");
+  }
+  if (c.body != null) {
+    const items = c.body.items;
+    if (items !== "features" && !(Array.isArray(items) && items.length))
+      errors.push('body.items は文の配列か "features" にしてください');
+  }
   const paths = c.pages.map((p) => normPath(p.path));
   if (new Set(paths).size !== paths.length) warnings.push("pages に同じパスが重複しています（末尾スラッシュ・.html 違いを含む）");
   return { errors, warnings };
@@ -80,6 +136,12 @@ export function buildLlms(c) {
   const pages = c.pages.map((p) => `- [${p.title}](${abs(p.path)})${p.summary ? `: ${p.summary}` : ""}`).join("\n");
   const feats = (c.features ?? []).map((f) => `- ${f}`).join("\n");
   const faq = (c.faq ?? []).map((f) => `### ${f.q}\n${f.a}`).join("\n\n");
+  // 料金は app.offers を書いたときだけ節にする（従来の app.price だけの設定では出力を変えない）
+  const pricing = Array.isArray(c.app?.offers)
+    ? c.app.offers
+        .map((o) => `- ${o.name}: ${priceText(c, o)}${o.description ? (c.lang === "ja" ? `（${o.description}）` : ` (${o.description})`) : ""}`)
+        .join("\n")
+    : "";
   const author = c.author?.name
     ? `\n## Optional\n- 作者: ${c.author.url ? `[${c.author.name}](${c.author.url})` : c.author.name}\n`
     : "";
@@ -91,7 +153,7 @@ ${c.description}
 
 ## Pages
 ${pages}
-${feats ? `\n## Features\n${feats}\n` : ""}${faq ? `\n## FAQ\n${faq}\n` : ""}${author}
+${feats ? `\n## Features\n${feats}\n` : ""}${pricing ? `\n## Pricing\n${pricing}\n` : ""}${faq ? `\n## FAQ\n${faq}\n` : ""}${author}
 <!-- ${MARKER} -->
 `;
 }
@@ -132,9 +194,11 @@ export function buildJsonLd(c) {
       operatingSystem: c.app?.os ?? "Web",
       ...(c.lang && { inLanguage: c.lang }),
       ...(c.ogImage && { image: absOf(c)(c.ogImage) }),
-      ...(c.app?.price != null && {
-        offers: { "@type": "Offer", price: c.app.price, priceCurrency: c.app.priceCurrency ?? "JPY" },
-      }),
+      ...(Array.isArray(c.app?.offers)
+        ? { offers: c.app.offers.map((o) => offerLd(c, o)) }
+        : c.app?.price != null && {
+            offers: { "@type": "Offer", price: c.app.price, priceCurrency: c.app.priceCurrency ?? "JPY" },
+          }),
       ...(c.features?.length && { featureList: c.features }),
       ...(c.author?.name && {
         author: { "@type": "Person", name: c.author.name, ...(c.author.url && { url: c.author.url }) },
@@ -208,4 +272,65 @@ export function injectHeadHtml(html, head) {
   inner = inner.replace(/\s*$/, "\n") + head + "\n";
   const start = m.index + m[0].indexOf(">") + 1;
   return { html: html.slice(0, start) + inner + html.slice(start + m[1].length), removed, ok: true };
+}
+
+// ---- 本文の紹介文（JS を実行しないクローラー・初めて来た人向け） ----
+// HTML に置いた <!-- GEO-BODY --><!-- /GEO-BODY --> の間を、body の設定から作ったブロックで入れ替える。
+// SPA の #root の中に置けば、JS が描画するまでの間だけ表示され、クローラーには本文として読める。
+//   body: {
+//     tag?: "div" | "main" | "section",     // 外側の要素（既定 div）
+//     heading?: true | string,               // 見出し h1（true なら name）
+//     lead?: true | string,                  // 導入の一文 p（true なら tagline）
+//     items: string[] | "features",          // 箇条書き ul（"features" なら features をそのまま）
+//     classes?: { root?, heading?, lead?, list? }  // CSS のクラス（Tailwind などに合わせる）
+//   }
+const BODY_TAGS = new Set(["div", "main", "section"]);
+
+export function buildBody(c) {
+  const b = c.body;
+  const cls = (k) => (b.classes?.[k] ? ` class="${esc(b.classes[k])}"` : "");
+  const tag = BODY_TAGS.has(b.tag) ? b.tag : "div";
+  const heading = b.heading === true ? c.name : b.heading;
+  const lead = b.lead === true ? c.tagline : b.lead;
+  const items = b.items === "features" ? c.features ?? [] : b.items ?? [];
+  const lines = [
+    `<${tag}${cls("root")}>`,
+    ...(heading ? [`  <h1${cls("heading")}>${esc(heading)}</h1>`] : []),
+    ...(lead ? [`  <p${cls("lead")}>${esc(lead)}</p>`] : []),
+    ...(items.length ? [`  <ul${cls("list")}>`, ...items.map((t) => `    <li>${esc(t)}</li>`), "  </ul>"] : []),
+    `</${tag}>`,
+  ];
+  return [`<!-- GEO-BODY: ${MARKER} -->`, ...lines, "<!-- /GEO-BODY -->"].join("\n");
+}
+
+const BODY_BLOCK = /([ \t]*)<!-- GEO-BODY(?::[^>]*)? -->[\s\S]*?<!-- \/GEO-BODY -->/;
+
+/** GEO-BODY の目印があれば入れ替える（目印の行の字下げにそろえる）。目印が無ければ found: false */
+export function injectBodyHtml(html, body) {
+  const m = BODY_BLOCK.exec(html);
+  if (!m) return { html, found: false };
+  const indent = m[1];
+  const block = body.split("\n").map((l, i) => (i === 0 ? indent + l : l ? indent + l : l)).join("\n");
+  return { html: html.slice(0, m.index) + block + html.slice(m.index + m[0].length), found: true };
+}
+
+// ---- _headers（Cloudflare Workers の静的アセット / Cloudflare Pages） ----
+// 静的アセットは .txt を charset なしの text/plain で返すため、日本語の llms.txt が化けうる
+// （wrangler dev は charset を付けるので、ローカルでは気づけない）。_headers で付ける。
+// extraPaths: llms-full.txt など、ほかに charset を付けたい .txt
+export function buildHeaders(c, extraPaths = []) {
+  const paths = ["/llms.txt", ...extraPaths, "/robots.txt"];
+  const rules = [...new Set(paths)].map((p) => `${p}\n  Content-Type: text/plain; charset=utf-8`).join("\n");
+  return `# GEO: ${MARKER}（テキストに charset=utf-8 を付ける。本番の静的アセットは付けないため）
+${rules}
+# /GEO`;
+}
+
+const HEADERS_BLOCK = /# GEO:[^\n]*\n[\s\S]*?# \/GEO[ \t]*/;
+
+/** _headers の GEO ブロックを入れ替える。無ければ末尾に足す（ほかのルールには触れない） */
+export function injectHeadersText(text, block) {
+  if (HEADERS_BLOCK.test(text)) return text.replace(HEADERS_BLOCK, block);
+  const base = text.replace(/\s*$/, "");
+  return (base ? base + "\n\n" : "") + block + "\n";
 }

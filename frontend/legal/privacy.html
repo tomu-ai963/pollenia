@@ -32,11 +32,29 @@
       "operatingSystem": "Web",
       "inLanguage": "ja",
       "image": "https://pollenia.tomu-ai.dev/assets/og.png",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "JPY"
-      },
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "無料プラン",
+          "price": "0",
+          "priceCurrency": "JPY",
+          "description": "記録・系統樹・QR ラベル・次の作業・交配ごとの発芽率・系統カード・ギャラリー・コミュニティ"
+        },
+        {
+          "@type": "Offer",
+          "name": "有料プラン",
+          "price": "300",
+          "priceCurrency": "JPY",
+          "description": "税込。AI による育種の相談と出品文の作成、親ごとの発芽率の比較、形質の分離の集計",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "300",
+            "priceCurrency": "JPY",
+            "billingDuration": "P1M",
+            "unitCode": "MON"
+          }
+        }
+      ],
       "featureList": [
         "個体・交配・採種・播種を記録すると、両親や祖父母までさかのぼる系統樹と、その株から生まれた系統が自動でつながります。",
         "バラ・クリスマスローズ・多肉植物・野菜・その他のジャンルごとに、花形・花弁数・葉色・紅葉など、そのジャンルらしい記録項目が出ます。",

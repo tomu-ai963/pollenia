@@ -55,11 +55,11 @@ cd worker && npm install
 npm run db:up && npm run db:migrate   # docker の Postgres（127.0.0.1:55435）
 npm run dev                           # http://localhost:8787（MOCK_MAIL=1 でログインコードはログに出る）
 npm run typecheck && npm test
-npm run geo                           # geo/geo.config.json → frontend/{robots,llms}.txt・sitemap.xml・各ページの <head>・ログイン欄の紹介文
+npm run geo                           # geo/geo.config.json → frontend/{robots,llms}.txt・sitemap.xml・各ページの <head>・ログイン欄の紹介文・_headers の charset
 ```
 
 - 機能・料金・画面の HTML の `<head>` を変えたら `geo/geo.config.json` を直して `npm run geo`（ずれると `test/geo.test.ts` が落ちる）。
-  `geo/geo-lib.mjs` は geo-kit のコピーなので手を入れない
+  `geo/geo-lib.mjs`・`geo-build.mjs`（と `*.d.mts`）は geo-kit のコピーなので手を入れない（kit を更新したら丸ごと差し替える）
 
 - 週1メールの cron を試す: `npm run dev -- --test-scheduled` → `curl "http://localhost:8787/__scheduled?cron=0+23+*+*+SUN"`
   （MOCK_MAIL=1 なら件名と行数だけがログに出る）
