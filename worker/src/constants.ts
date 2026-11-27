@@ -106,3 +106,10 @@ export const AI_MARKETPLACES = ['mercari', 'yahoo_auction'] as const;
 export type AiMarketplace = (typeof AI_MARKETPLACES)[number];
 // メルカリの商品名上限（プロンプトと出力クランプの両方で使う）。
 export const AI_LISTING_TITLE_MAX = 40;
+
+// ============================================================
+// 発芽率の集計（GET /api/analytics/germination*）
+// ============================================================
+
+// 集計に使う播種の上限（新しい順）。1ユーザーの記録量として十分大きく、1リクエストの負荷の上限にもなる。
+export const ANALYTICS_MAX_SOWINGS = 5000;

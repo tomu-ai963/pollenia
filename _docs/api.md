@@ -145,7 +145,22 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
   判定は advisory lock でユーザー単位に直列化した「insert → 自分を含めた count」の順
   （Opus 4.8 レビュー M1: check-then-insert の TOCTOU で並行リクエストがすり抜けるのを防ぐ）。
   429 になった試行もイベントとして残る。
-- 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）、
-  /api/analytics/germination（発芽率グラフ）。
+- 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）。
+
+## 発芽率の集計（routes/analytics.ts。すべてセッション + profiles 行を要求）
+
+| Method | Path | 内容 |
+|---|---|---|
+| GET | /api/analytics/germination | 交配ごとの発芽率と全体の合計（**無料**） |
+| GET | /api/analytics/germination/parents | 親個体ごとの比較（母木として / 花粉親として。**有料**・未加入は 402） |
+
+- 元データは自分の sowings（→ seed_harvests → crossings）のみ。3表とも検証済み uid で絞る。
+  新しい播種から `ANALYTICS_MAX_SOWINGS` 件まで。
+- 集計 1 件の形: `{ sowings, pending_sowings, sown, germinated, rate, avg_days_to_germination }`。
+  発芽率に入れるのは「播種数 > 0 かつ発芽数が記録済み」の播種だけ（未記録は `pending_sowings`。
+  0 発芽として数えない）。発芽数が播種数を超える入力は播種数で頭打ち。記録が無ければ `rate: null`。
+- 発芽までの日数は `first_germination_date - sowing_date`（0 日以上のものの平均）。
+- 親ごと: 父不明の交配は母木側だけ、自家受粉は母木・花粉親の両方に入る。
+- 画面は記録タブの「発芽率」カード。発芽数は交配記録一覧の「発芽を記録」（`PATCH /api/sowings/:id`）で入れる。
 
 エラーレスポンス・HTTP ヘルパーは knowledge-rag の `lib/http.ts` / `lib/error-response.ts` の形式を踏襲する。

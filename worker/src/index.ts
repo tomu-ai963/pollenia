@@ -35,6 +35,7 @@ import {
 } from './routes/records';
 import { handleGetLineage } from './routes/lineage';
 import { handlePublicPlant } from './routes/public';
+import { handleGerminationByCrossing, handleGerminationByParent } from './routes/analytics';
 import {
   handleCreateComment,
   handleCreateLike,
@@ -84,6 +85,9 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //     - POST /api/ai/consult、POST /api/ai/listing
 //   Phase 4（課金。Stripe 月額サブスク ¥300/月）
 //     - POST /api/billing/checkout、POST /api/billing/portal
+//   発芽率の集計（routes/analytics.ts）
+//     - GET  /api/analytics/germination          … 交配ごと + 全体（無料）
+//     - GET  /api/analytics/germination/parents  … 親個体ごとの比較（有料ゲート）
 //
 // 状態を変えるメソッド（POST/PUT/PATCH/DELETE）は workers-auth の middleware が Origin と
 // CSRF 二重送信トークン（__Host-csrf Cookie ↔ x-csrf-token ヘッダ）を確かめる。
@@ -244,6 +248,16 @@ async function route(
   }
 
   // --- Phase 3: AI -----------------------------------------------------------
+
+  if (pathname === '/api/analytics/germination') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleGerminationByCrossing(sql, user);
+  }
+
+  if (pathname === '/api/analytics/germination/parents') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleGerminationByParent(sql, user);
+  }
 
   if (pathname === '/api/ai/consult') {
     if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');

@@ -87,6 +87,10 @@ export const api = {
   updateSowing: (sowingId, patch) =>
     call(`/api/sowings/${sowingId}`, { method: 'PATCH', body: patch }),
 
+  // 発芽率の集計（交配ごとは無料・親ごとは有料プラン）
+  germination: () => call('/api/analytics/germination'),
+  germinationParents: () => call('/api/analytics/germination/parents'),
+
   // lineage
   lineage: (plantId, direction = 'up', depth = 5) =>
     call(`/api/plants/${plantId}/lineage?direction=${direction}&depth=${depth}`),

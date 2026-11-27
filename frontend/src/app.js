@@ -4,6 +4,7 @@ import { api, auth, ApiError } from './api.js';
 import { renderAncestors, renderDescendants } from './lineage-render.js';
 import { initCommunity, openMyProfile, loadCrossingOptions } from './community.js';
 import { initAi, resetListingUi } from './ai.js';
+import { initGermination, loadGermination } from './germination.js';
 import { reencodePhoto } from './photo-image.js';
 import { planLabel } from './plan-label.js';
 import { parsePlantParam, PLANT_PARAM } from './plant-link.js';
@@ -199,6 +200,7 @@ async function refreshSession() {
     switchTab('timeline');
     initCommunity({ me: profile, switchTab });
     initAi({ isSubscribed });
+    initGermination({ isSubscribed, switchTab });
     renderPlan();
     handleCheckoutReturn();
     await Promise.all([loadPlants(), loadCrossings()]);
@@ -618,7 +620,16 @@ $('photo-camera').onchange = async () => {
 
 // ---- 交配・採種・播種 --------------------------------------------------------
 
+// 発芽数を入れる播種: 発芽が未記録のうち最も新しいもの。無ければ最も新しい播種（入れ直し）。
+function sowingForGermination(c) {
+  const sowings = c.harvests.flatMap((h) => h.sowings);
+  const pending = sowings.filter((s) => s.germination_count === null);
+  return (pending.length ? pending : sowings).at(-1) ?? null;
+}
+
 async function loadCrossings() {
+  // 発芽率の集計は交配記録の変更に追従させる（失敗しても一覧の表示は止めない。エラーは集計カードに出る）
+  loadGermination();
   const { crossings } = await api.listCrossings();
   const list = $('crossing-list');
   list.replaceChildren();
@@ -681,6 +692,34 @@ async function loadCrossings() {
         await loadCrossings();
       };
       btns.appendChild(addSowing);
+    }
+    const target = sowingForGermination(c);
+    if (target) {
+      const addGerm = document.createElement('button');
+      addGerm.className = 'small ghost';
+      addGerm.textContent = '発芽を記録';
+      addGerm.onclick = async () => {
+        setError('crossing-error', null);
+        const label = `${target.sowing_date ?? '日付なし'}にまいた${target.sowing_count ?? '?'}粒`;
+        const input = prompt(`発芽数（${label}）:`, target.germination_count ?? '');
+        if (input === null) return;
+        const count = Number(input);
+        if (input.trim() === '' || !Number.isInteger(count) || count < 0) {
+          return setError('crossing-error', new Error('発芽数は 0 以上の整数で入力してください。'));
+        }
+        const patch = { germination_count: count };
+        // 初発芽日が未記録なら今日にする（発芽までの日数の集計に使う）
+        if (count > 0 && !target.first_germination_date) {
+          patch.first_germination_date = new Date().toISOString().slice(0, 10);
+        }
+        try {
+          await api.updateSowing(target.id, patch);
+          await loadCrossings();
+        } catch (e) {
+          setError('crossing-error', e);
+        }
+      };
+      btns.appendChild(addGerm);
     }
 
     // 削除（物理削除・カスケード）。紐づく採種・播種があれば件数を明示して警告する。

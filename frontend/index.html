@@ -440,6 +440,21 @@
         <div id="crossing-list"></div>
       </section>
 
+      <!-- 発芽率の集計。交配ごとは無料、親ごとの比較は有料プラン -->
+      <section class="card" id="germination-card">
+        <h2>発芽率</h2>
+        <p class="notice" id="germ-overall"></p>
+        <div id="germ-crossings"></div>
+        <h3 class="germ-subhead">親ごとの比較（有料プラン）</h3>
+        <p class="notice">同じ個体を母木・花粉親に使った交配をまとめて、どの親の種がよく発芽するかを比べます。</p>
+        <p class="notice hidden" id="germ-parents-locked">
+          有料プラン（¥300/月）でご利用いただけます。
+          <button class="small ghost" id="btn-germ-to-plan">プランを見る</button>
+        </p>
+        <div id="germ-parents"></div>
+        <div class="error" id="germ-error"></div>
+      </section>
+
       <!-- 交配記録を編集 -->
       <section class="card hidden" id="crossing-edit-card">
         <div class="card-head">
