@@ -625,9 +625,19 @@ a.button-link {
 .gallery-item-body { padding: 0.5rem 0.7rem 0.7rem; }
 .gallery-item-body strong { display: block; font-weight: 500; overflow-wrap: anywhere; }
 .gallery-item-body .meta { font-size: 0.74rem; color: var(--muted); }
-#btn-gallery-more { display: block; margin: 16px auto; }
+/* :not(.hidden) — id の指定は .hidden より強いので、隠すときに display:block で上書きしない */
+#btn-gallery-more:not(.hidden) { display: block; margin: 16px auto; }
 #gallery-empty { text-align: center; }
 
 /* 過去の記録の取り込み（記録タブ） */
 #import-file { margin: 0.4rem 0; }
 .import-errors { margin: 0.4rem 0 0; padding-left: 1.2rem; color: #b94a48; font-size: 0.82rem; }
+
+/* 個体を開けなかったとき（他人の個体・削除済みの QR など）は、見出しとエラーだけを出す */
+#detail-card.load-failed > :not(.card-head):not(#detail-error) { display: none; }
+
+/* scrollIntoView で止まる位置を、上に固定されたヘッダーの下にする（見出しがヘッダーに隠れないように） */
+.card { scroll-margin-top: 80px; }
+
+/* 押せないボタンは見た目でも分かるように（これまでは押せるときと同じ見た目だった） */
+button:disabled { opacity: 0.45; cursor: not-allowed; }

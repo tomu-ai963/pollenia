@@ -27,6 +27,8 @@ async function loadSowings(sql: Sql, uid: string): Promise<SowingWithParents[]> 
     join pollenia.seed_harvests h on h.id = s.seed_harvest_id and h.user_id = ${uid}::uuid
     join pollenia.crossings c on c.id = h.crossing_id and c.user_id = ${uid}::uuid
     where s.user_id = ${uid}::uuid
+      -- 播種数も発芽数も無い播種（CSV 取り込みで系統をつなぐために作ったもの）は集計に入れない
+      and (s.sowing_count is not null or s.germination_count is not null)
     order by s.created_at desc
     limit ${ANALYTICS_MAX_SOWINGS}
   `;

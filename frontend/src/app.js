@@ -558,6 +558,7 @@ async function openDetail(plantId) {
   setError('detail-error', null);
   // 読み込みに失敗したとき、前に開いていた個体へ写真を保存しないよう先に外す
   $('detail-card').dataset.plantId = '';
+  $('detail-card').classList.remove('load-failed');
   $('detail-title').textContent = '読み込み中…';
   try {
     const { plant, photos } = await api.getPlant(plantId);
@@ -587,6 +588,7 @@ async function openDetail(plantId) {
     if (!$('detail-card').dataset.plantId) {
       // 個体そのものが開けなかった（他人の個体・削除済みの QR など）。前の個体の表示を残さない
       $('detail-title').textContent = '個体を開けませんでした';
+      $('detail-card').classList.add('load-failed'); // 撮影・写真・系統の欄を隠し、エラーだけ見せる
       $('detail-photos').replaceChildren();
       $('lineage-tree').replaceChildren();
       $('detail-card').scrollIntoView({ behavior: 'smooth' });
@@ -695,18 +697,22 @@ $('photo-camera').onchange = async () => {
 
 // ---- 交配・採種・播種 --------------------------------------------------------
 
+// 数の記録が無い採種・播種（CSV 取り込みで系統をつなぐために作ったもの）。一覧の要約とボタンには出さない
+const isLinkOnlySowing = (s) => s.sowing_count === null && s.germination_count === null;
+const isLinkOnlyHarvest = (h) => h.seed_count === null && h.sowings.every(isLinkOnlySowing);
+
 // 発芽数を入れる播種: 発芽が未記録のうち最も新しいもの。無ければ最も新しい播種（入れ直し）。
 function sowingForGermination(c) {
-  const sowings = c.harvests.flatMap((h) => h.sowings);
+  const sowings = c.harvests.flatMap((h) => h.sowings).filter((s) => !isLinkOnlySowing(s));
   const pending = sowings.filter((s) => s.germination_count === null);
   return (pending.length ? pending : sowings).at(-1) ?? null;
 }
 
 async function loadCrossings() {
   // 発芽率の集計と「次の作業」は交配記録の変更に追従させる
-  // （失敗しても一覧の表示は止めない。エラーはそれぞれのカードに出る）
-  loadGermination();
-  loadTasks();
+  // （失敗しても一覧の表示は止めない。エラーはそれぞれのカードに出る＝この 2 つは reject しない）。
+  // 最後に待つ: QR の直リンクで個体を開くとき、上のカードが後から伸びてスクロール位置がずれないように
+  const sideCards = Promise.all([loadGermination(), loadTasks()]);
   const { crossings } = await api.listCrossings();
   const list = $('crossing-list');
   list.replaceChildren();
@@ -724,8 +730,10 @@ async function loadCrossings() {
     const meta = document.createElement('div');
     meta.className = 'meta';
     const harvestSummary = c.harvests
+      .filter((h) => !isLinkOnlyHarvest(h))
       .map((h) => {
         const sowings = h.sowings
+          .filter((s) => !isLinkOnlySowing(s))
           .map((s) => `播種${s.sowing_count ?? '?'}・発芽${s.germination_count ?? '-'}`)
           .join(' / ');
         return `採種${h.seed_count ?? '?'}粒${sowings ? `（${sowings}）` : ''}`;
@@ -787,6 +795,7 @@ async function loadCrossings() {
     div.appendChild(btns);
     list.appendChild(div);
   }
+  await sideCards;
 }
 
 // 自家受粉チェック時は花粉親セレクトを無効化（花粉親＝母木として送るため選択不要）。
