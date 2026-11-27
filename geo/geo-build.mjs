@@ -28,6 +28,7 @@ import {
   buildHead,
   buildBody,
   buildHeaders,
+  buildGuide,
   injectHeadHtml,
   injectBodyHtml,
   injectHeadersText,
@@ -60,6 +61,8 @@ export function planFiles(c, opts) {
     [join(outDir, "robots.txt")]: buildRobots(c),
     [join(outDir, "llms.txt")]: buildLlms(c),
     [join(outDir, "sitemap.xml")]: buildSitemap(c, lastmod),
+    // 使い方ガイド（設定に guide があるときだけ）。llms.txt の ## Docs からリンクされる
+    ...(c.guide && { [join(outDir, c.guide.path)]: buildGuide(c) }),
   };
   const files = { ...owned };
 
@@ -94,7 +97,9 @@ export function planFiles(c, opts) {
     if (c.body && !bodyPlaced) warnings.push("body を設定していますが、どの HTML にも <!-- GEO-BODY --><!-- /GEO-BODY --> の目印がありません");
   }
 
-  if (headers) files[headers] = injectHeadersText(readOr(headers, ""), buildHeaders(c, headersExtra));
+  // 使い方ガイドも .txt なので charset を付ける
+  const extra = c.guide ? [c.guide.path, ...headersExtra] : headersExtra;
+  if (headers) files[headers] = injectHeadersText(readOr(headers, ""), buildHeaders(c, extra));
 
   return { files, owned: new Set(Object.keys(owned)), warnings };
 }

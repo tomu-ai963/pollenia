@@ -26,6 +26,25 @@ export interface GeoBody {
   items: string[] | "features";
   classes?: { root?: string; heading?: string; lead?: string; list?: string };
 }
+export interface GeoGuideSection {
+  heading: string;
+  /** 本文を設定のほかの項目から作る印（features = description と機能一覧、faq = FAQ） */
+  from?: "features" | "faq";
+  lead?: string;
+  items?: string[];
+  subsections?: { heading: string; items: string[] }[];
+}
+/** 使い方ガイド（利用者が URL を自分の AI に渡して使い方を聞く説明書。既定は /llms-full.txt） */
+export interface GeoGuide {
+  path: string;
+  title: string;
+  /** llms.txt の ## Docs でのリンクの説明 */
+  summary: string;
+  lead: string;
+  aiNotes: string[];
+  readingMap: { ask: string; section: string }[];
+  sections: GeoGuideSection[];
+}
 export interface GeoConfig {
   siteUrl: string;
   name: string;
@@ -46,6 +65,7 @@ export interface GeoConfig {
   features?: string[];
   faq?: { q: string; a: string }[];
   body?: GeoBody;
+  guide?: GeoGuide;
   aiCrawlers?: { allow?: string[]; disallowPaths?: string[] };
   /** 組み込み先が独自に足す項目（geo-lib は読まない） */
   [key: string]: unknown;
@@ -61,6 +81,7 @@ export function buildJsonLd(c: GeoConfig): string;
 export function buildHead(c: GeoConfig, pagePath?: string): string;
 export function injectHeadHtml(html: string, head: string): { html: string; removed: number; ok: boolean };
 export function buildBody(c: GeoConfig): string;
+export function buildGuide(c: GeoConfig): string;
 export function injectBodyHtml(html: string, body: string): { html: string; found: boolean };
 export function buildHeaders(c: GeoConfig, extraPaths?: string[]): string;
 export function injectHeadersText(text: string, block: string): string;
