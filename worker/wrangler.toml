@@ -23,9 +23,10 @@ APP_ORIGIN = "https://pollenia.tomu-ai.dev"
 # 「次の作業」の週1メール（src/scheduled.ts）。毎週月曜 8:00 JST = 日曜 23:00 UTC に送り始め、
 # 月曜 9:00〜20:00 JST（月曜 0〜11 時 UTC）にも毎時動かす。1 回に処理するのは DIGEST_MAX_PER_RUN 人までなので、
 # 残った人・送信に失敗した人を同じ日のうちに拾う（今日すでに処理した人は task_digest_last_sent_on で除くので二重に送らない）。
-# ローカルで試す: npm run dev -- --test-scheduled → curl "http://localhost:8787/__scheduled?cron=0+23+*+*+0"
+# 曜日は名前で書く（Cloudflare の数字は 1 = 日曜〜7 = 土曜で、一般的な cron の 0 = 日曜と違う。0 は登録できない）。
+# ローカルで試す: npm run dev -- --test-scheduled → curl "http://localhost:8787/__scheduled?cron=0+23+*+*+SUN"
 [triggers]
-crons = ["0 23 * * 0", "0 0-11 * * 1"]
+crons = ["0 23 * * SUN", "0 0-11 * * MON"]
 
 # --- 利用者ごとの回数制限（src/lib/rate-limit.ts。Workers の Rate Limiting バインディング）---
 # 書き込みの多い操作を、検証済み uid ごとに数える（期間は 10 か 60 秒。拠点ごとの近似）。

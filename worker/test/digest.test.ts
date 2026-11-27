@@ -230,8 +230,12 @@ describe('cron の設定（wrangler.toml）', () => {
     const { readFileSync } = await import('node:fs');
     const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
     const crons = toml.match(/^crons = \[(.*)\]$/m)?.[1] ?? '';
-    expect(crons).toContain('"0 23 * * 0"');
-    expect(crons).toContain('"0 0-11 * * 1"');
+    expect(crons).toContain('"0 23 * * SUN"');
+    expect(crons).toContain('"0 0-11 * * MON"');
+    // 曜日は名前で書く（Cloudflare の数字は 1 = 日曜〜7 = 土曜。0 は登録できず、1 は月曜ではなく日曜になる）
+    for (const expr of crons.match(/"([^"]+)"/g) ?? []) {
+      expect(expr.replace(/"/g, '').split(' ')[4]).toMatch(/^(\*|[A-Z]{3}(-[A-Z]{3})?)$/);
+    }
     // 追加の実行もすべて JST の月曜（同じ「今日」）に入る＝処理済みの印で二重に送らない
     for (const h of [0, 11]) {
       expect(todayJst(new Date(Date.UTC(2026, 10, 30, h, 0)))).toBe('2026-11-30');
