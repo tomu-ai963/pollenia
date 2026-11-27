@@ -19,6 +19,7 @@ export interface Plan {
   owned: Set<string>;
   warnings: string[];
 }
+export const VERSION: string;
 export function sameText(a: string, b: string): boolean;
 export function htmlCandidates(path: string): string[];
 export function planFiles(c: GeoConfig, opts: PlanOptions): Plan;

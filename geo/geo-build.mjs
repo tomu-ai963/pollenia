@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // GEO kit generator — 依存なし（Node 18+）
-// 使い方: node geo-build.mjs [config] [outDir] [--inject] [--html-root=<dir>] [--headers=<file>] [--check] [--force]
+// 使い方: node geo-build.mjs [config] [outDir] [--inject] [--html-root=<dir>] [--headers=<file>] [--check] [--force] [--version]
 //   例) node geo-build.mjs geo.config.json public
 //       node geo-build.mjs geo/geo.config.json docs --inject
 //       node geo-build.mjs geo/geo.config.json frontend/public --inject --html-root=frontend --headers=frontend/public/_headers --check
@@ -11,7 +11,8 @@
 //   --html-root=<dir> 注入する HTML の場所（既定は outDir）。Vite の入口（index.html）が公開ディレクトリの外にある場合など
 //   --headers=<file>  Cloudflare の _headers に、llms.txt・robots.txt の charset=utf-8 を書き込む（GEO ブロックだけ入れ替える）
 //   --check           書き込まずに、生成物とファイルが一致するかだけを見る（ずれていれば終了コード 1。CI・テスト用）
-//   --force           geo-build.mjs が作っていない既存の robots.txt などを上書きする
+//   --force           GEO Kit が作っていない既存の robots.txt などを上書きする
+//   --version         kit の版を表示する（kit 本体と照合するとき）
 //
 // 組み込み先のスクリプトから使う場合は planFiles() / syncFiles() を import する（下の export）。
 // geo-head.html（貼り付け用スニペット）は --inject を使わないときだけ、config と同じ場所に出力する。
@@ -19,7 +20,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  MARKER,
+  VERSION as LIB_VERSION,
+  isGenerated,
   checkConfig,
   normPath,
   buildRobots,
@@ -33,6 +35,11 @@ import {
   injectBodyHtml,
   injectHeadersText,
 } from "./geo-lib.mjs";
+
+// 版の番号（geo-lib.mjs と同じでなければ、片方だけ差し替えたことになる）
+export const VERSION = "1.0.0";
+if (LIB_VERSION !== VERSION)
+  throw new Error(`geo-build.mjs (${VERSION}) と geo-lib.mjs (${LIB_VERSION}) の版が違います。kit のファイルは丸ごと差し替えてください`);
 
 /** 改行コードの違いを無視して比べる（git の core.autocrlf=true の checkout では CRLF になる） */
 export function sameText(a, b) {
@@ -106,7 +113,7 @@ export function planFiles(c, opts) {
 
 /**
  * 計画した生成物を書き込む（check なら書き込まずに照合だけ）。
- *   owned に入っているファイルが手書き（MARKER を含まない）で、force でなければ上書きせずに skipped へ
+ *   owned に入っているファイルが手書き（GEO Kit の印を含まない）で、force でなければ上書きせずに skipped へ
  * 戻り値: { written, stale, skipped }（どれもパスの配列）
  */
 export function syncFiles({ files, owned = new Set() }, { check = false, force = false } = {}) {
@@ -116,7 +123,7 @@ export function syncFiles({ files, owned = new Set() }, { check = false, force =
   for (const [path, body] of Object.entries(files)) {
     const current = readOr(path);
     if (current !== null && sameText(current, body)) continue;
-    if (current !== null && owned.has(path) && !current.includes(MARKER) && !force) {
+    if (current !== null && owned.has(path) && !isGenerated(current) && !force) {
       skipped.push(path);
       continue;
     }
@@ -141,6 +148,10 @@ function main(argv) {
     if (m) opts[m[1]] = m[2];
     else if (a.startsWith("--")) flags.add(a);
     else positional.push(a);
+  }
+  if (flags.has("--version")) {
+    console.log(VERSION);
+    return 0;
   }
   for (const f of flags) {
     if (!["--inject", "--force", "--check"].includes(f)) {
