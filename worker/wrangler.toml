@@ -20,10 +20,12 @@ MAIL_FROM = "Pollenia <noreply@tomu-ai.dev>"
 # 週1メールのリンクの起点（cron にはリクエストが無いため）
 APP_ORIGIN = "https://pollenia.tomu-ai.dev"
 
-# 「次の作業」の週1メール（src/scheduled.ts）。毎週月曜 8:00 JST = 日曜 23:00 UTC。
+# 「次の作業」の週1メール（src/scheduled.ts）。毎週月曜 8:00 JST = 日曜 23:00 UTC に送り始め、
+# 月曜 9:00〜20:00 JST（月曜 0〜11 時 UTC）にも毎時動かす。1 回に処理するのは DIGEST_MAX_PER_RUN 人までなので、
+# 残った人・送信に失敗した人を同じ日のうちに拾う（今日すでに処理した人は task_digest_last_sent_on で除くので二重に送らない）。
 # ローカルで試す: npm run dev -- --test-scheduled → curl "http://localhost:8787/__scheduled?cron=0+23+*+*+0"
 [triggers]
-crons = ["0 23 * * 0"]
+crons = ["0 23 * * 0", "0 0-11 * * 1"]
 
 # --- 画面（frontend/ をそのまま静的配信。ビルドなし）---
 # 静的ファイルに一致したパスは Worker を通らずに返る。一致しないパス（/api/*・/auth/*・
