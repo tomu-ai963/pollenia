@@ -208,6 +208,16 @@
       </div>
 
       <div class="error" id="auth-error"></div>
+
+      <!-- 使う前に AI に聞いてみる（使い方ガイド /llms-full.txt。コピーの動作は src/ai-guide.js） -->
+      <div class="ai-guide">
+        <h3>使う前に AI に聞いてみる</h3>
+        <p class="notice">お使いの AI（ChatGPT・Claude など）にこの URL を渡すと、Pollenia の説明書を読んで、どんなアプリか・自分に合いそうかを答えてくれます。</p>
+        <a class="ai-guide-url" href="https://pollenia.tomu-ai.dev/llms-full.txt" target="_blank" rel="noopener noreferrer">https://pollenia.tomu-ai.dev/llms-full.txt</a>
+        <button type="button" class="small ghost" data-ai-guide="login">URL をコピー</button>
+        <p class="notice" role="status"></p>
+      </div>
+
       <p class="notice gallery-link">
         <a href="/gallery">ログインせずに、みんなの育種ギャラリーを見る →</a>
       </p>
@@ -259,6 +269,16 @@
           <button id="btn-ai-send">送信</button>
           <button class="ghost" id="btn-ai-clear">会話をクリア</button>
           <div class="error" id="ai-error"></div>
+        </section>
+
+        <!-- AI に使い方を聞く（使い方ガイド /llms-full.txt。有料プランは不要。コピーの動作は src/ai-guide.js） -->
+        <section class="card ai-guide">
+          <h2>AI に使い方を聞く</h2>
+          <p class="notice">お使いの AI（ChatGPT・Claude など）にこの URL を渡すと、Pollenia の説明書として読んでくれます。使い方がわからないときに、AI に聞いてみてください。有料プランは要りません。</p>
+          <a class="ai-guide-url" href="https://pollenia.tomu-ai.dev/llms-full.txt" target="_blank" rel="noopener noreferrer">https://pollenia.tomu-ai.dev/llms-full.txt</a>
+          <button type="button" class="small ghost" data-ai-guide="app">URL をコピー</button>
+          <p class="notice" role="status"></p>
+          <p class="notice">AI の答えは Pollenia が書いたものではありません。登録品種かどうかは、農林水産省の品種登録ホームページでお確かめください。</p>
         </section>
       </div>
 

@@ -104,6 +104,21 @@ export function checkConfig(c) {
       });
     if (c.app.price != null) warnings.push("app.price は app.offers があるので使われません（どちらか一方に）");
   }
+  if (c.guide != null) {
+    const g = c.guide;
+    if (typeof g.path !== "string" || !/^\/[^?#]*\.txt$/.test(g.path)) errors.push('guide.path は "/llms-full.txt" のように / で始まる .txt にしてください');
+    for (const key of ["title", "summary", "lead"]) if (!g[key]) errors.push(`guide.${key} が未設定です`);
+    if (!Array.isArray(g.sections) || g.sections.length === 0) errors.push("guide.sections が空です");
+    else {
+      const headings = new Set(g.sections.map((s) => s.heading));
+      (g.readingMap ?? []).forEach((r) => {
+        if (!headings.has(r.section)) errors.push(`guide.readingMap の「${r.section}」は sections にありません`);
+      });
+      g.sections.forEach((s, i) => {
+        if (s.from && !["features", "faq"].includes(s.from)) errors.push(`guide.sections[${i}].from は "features" か "faq" です`);
+      });
+    }
+  }
   if (c.body != null) {
     const items = c.body.items;
     if (items !== "features" && !(Array.isArray(items) && items.length))
@@ -153,7 +168,7 @@ ${c.description}
 
 ## Pages
 ${pages}
-${feats ? `\n## Features\n${feats}\n` : ""}${pricing ? `\n## Pricing\n${pricing}\n` : ""}${faq ? `\n## FAQ\n${faq}\n` : ""}${author}
+${c.guide ? `\n## Docs\n- [${c.guide.title}](${abs(c.guide.path)}): ${c.guide.summary}\n` : ""}${feats ? `\n## Features\n${feats}\n` : ""}${pricing ? `\n## Pricing\n${pricing}\n` : ""}${faq ? `\n## FAQ\n${faq}\n` : ""}${author}
 <!-- ${MARKER} -->
 `;
 }
@@ -334,4 +349,62 @@ export function injectHeadersText(text, block) {
   if (HEADERS_BLOCK.test(text)) return text.replace(HEADERS_BLOCK, block);
   const base = text.replace(/\s*$/, "");
   return (base ? base + "\n\n" : "") + block + "\n";
+}
+
+// ---- 使い方ガイド（guide。既定は /llms-full.txt） ----
+// 利用者が URL を自分の AI（ChatGPT・Claude など）に渡して、使い方を聞くための説明書。
+// llms.txt（概要。検索・GEO 向け）とは読み手が違う。開いた AI が最初の数行で「どこを読めばいいか」と
+// 「答えるときに守ること」が分かるよう、冒頭に読む章の対応表と AI へのお願いを置き、目次は章の見出しから作る。
+//   guide: {
+//     path, title, summary,       // llms.txt の ## Docs からリンクする（summary はその説明）
+//     lead,                        // 冒頭の一文
+//     aiNotes: string[],           // 答えるときのお願い
+//     readingMap: [{ ask, section }],  // 利用者が知りたいこと → 読む章（section は sections の heading）
+//     sections: [{ heading, from?: "features" | "faq", lead?, items?, subsections?: [{ heading, items }] }]
+//   }
+// 章の from は本文を設定のほかの項目から作る印（features = description と機能一覧、faq = FAQ）。
+// llms.txt・JSON-LD と同じ文を使い、料金などが片方だけ古くなるのを防ぐ。
+export function buildGuide(c) {
+  const g = c.guide;
+  const base = baseOf(c);
+  const bullets = (items) => (items ?? []).map((t) => `- ${t}`).join("\n");
+  const bodyOf = (s) => {
+    const parts = [];
+    if (s.from === "features") parts.push(`${c.description}\n\n主な機能:\n${bullets(c.features)}`);
+    if (s.from === "faq") parts.push((c.faq ?? []).map((f) => `### ${f.q}\n${f.a}`).join("\n\n"));
+    if (s.lead) parts.push(s.lead);
+    if (s.items?.length) parts.push(bullets(s.items));
+    for (const sub of s.subsections ?? []) parts.push(`### ${sub.heading}\n${bullets(sub.items)}`);
+    return parts.join("\n\n");
+  };
+  const map = (g.readingMap ?? []).map((r) => `| ${r.ask} | ${r.section} |`).join("\n");
+  const toc = g.sections.map((s) => `- ${s.heading}`).join("\n");
+  const sections = g.sections.map((s) => `## ${s.heading}\n\n${bodyOf(s)}`).join("\n\n");
+  return `# ${c.name} ${g.title}
+
+> ${g.lead}
+
+- サイト: ${base}/
+- この説明書: ${base}${g.path}
+
+## AI の方へ（最初にお読みください）
+
+利用者が知りたいことに応じて、次の章を読んでください。
+
+| 利用者が知りたいこと | 読む章 |
+|---|---|
+${map}
+
+答えるときのお願い:
+
+${bullets(g.aiNotes)}
+
+## 目次
+
+${toc}
+
+${sections}
+
+<!-- ${MARKER} -->
+`;
 }

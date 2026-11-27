@@ -666,3 +666,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .exchange-box .meta { font-size: 0.76rem; color: var(--muted); }
 .exchange-status { margin-left: 0.5rem; font-size: 0.72rem; padding: 0.05rem 0.5rem; border-radius: 999px; background: #fff; }
 .exchange-status.closed { color: var(--muted); }
+
+/* 「AI に使い方を聞く」（src/ai-guide.js）。ログイン欄の中と「AI相談」タブのカード */
+.ai-guide { margin-top: 1rem; }
+.card.ai-guide { margin-top: 0; }
+#auth-card .ai-guide { padding-top: 0.9rem; border-top: 1px dashed var(--line); }
+.ai-guide h3 { margin: 0 0 0.4rem; font-size: 0.95rem; font-weight: 500; }
+.ai-guide-url { display: block; margin: 0.4rem 0; font-size: 0.85rem; word-break: break-all; }
+.ai-guide [role="status"]:empty { display: none; }

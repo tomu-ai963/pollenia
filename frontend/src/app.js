@@ -17,6 +17,7 @@ import { planLabel } from './plan-label.js';
 import { fillGenreSelect, renderTraitFields, readTraitFields } from './trait-form.js';
 import { genreLabel } from './trait-spec.js';
 import { parsePlantParam, PLANT_PARAM } from './plant-link.js';
+import { initAiGuide } from './ai-guide.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -974,4 +975,6 @@ $('btn-import-run').onclick = async () => {
 $('btn-cancel-crossing-edit').onclick = () => show('crossing-edit-card', false);
 $('btn-crossing-edit-close').onclick = () => show('crossing-edit-card', false);
 
+// 「URL をコピー」（使い方ガイド）。ログイン欄にもあるので、ログインの前に付ける
+initAiGuide();
 refreshSession();
