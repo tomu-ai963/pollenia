@@ -30,11 +30,11 @@ describe('targetSize', () => {
 
 describe('アップロードの流れ（app.js）', () => {
   const app = read('app.js');
-  // 写真の保存はすべて savePhoto を通す（ファイル選択の「アップロード」と QR から開いた「撮影して記録」）
+  // 写真の保存はすべて savePhoto を通す（「アップロード」・QR から開いた「撮影して記録」・まとめて追加）
   const handler = app.slice(app.indexOf('async function savePhoto('), app.indexOf("$('btn-upload-photo').onclick"));
 
-  it('選んだ写真・撮った写真は、どちらも savePhoto を通して送る', () => {
-    expect(app.match(/await savePhoto\(plantId, file, /g)).toHaveLength(2);
+  it('選んだ写真・撮った写真・まとめて選んだ写真は、どれも savePhoto を通して送る', () => {
+    expect(app.match(/await savePhoto\(plantId, file, /g)).toHaveLength(3);
     expect(app.match(/api\.createPhoto\(/g)).toHaveLength(1);
     expect(app.match(/api\.uploadPhoto\(/g)).toHaveLength(1);
   });

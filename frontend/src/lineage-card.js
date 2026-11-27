@@ -4,25 +4,13 @@
 // URL・QR は入れない: フリマの出品画像では外部サイトへの誘導が禁止されていることがあり、
 // 規約に触れると損をするのは出品者のため。入れるのは「Pollenia 育種記録」の表記だけ。
 
+import { traitEntries } from './trait-spec.js';
+
 export const CARD_SIZE = 1080;
 
-const BLOOM = { spring: '春', early_summer: '初夏', summer: '夏', autumn: '秋', winter: '冬' };
-
-/** 特性 → カードに載せる行（空の項目は出さない） */
+/** 特性 → カードに載せる行（空の項目は出さない。項目の定義は trait-spec.js） */
 export function traitLines(traits = {}) {
-  const lines = [];
-  if (traits.bloom_season) lines.push(`開花時期　${BLOOM[traits.bloom_season] ?? traits.bloom_season}`);
-  if (traits.fragrance_strength !== undefined && traits.fragrance_strength !== null) {
-    lines.push(`香りの強さ　${traits.fragrance_strength} / 5`);
-  }
-  if (traits.fragrance_type) lines.push(`香りの系統　${traits.fragrance_type}`);
-  if (traits.plant_height_cm !== undefined && traits.plant_height_cm !== null) {
-    lines.push(`草丈　${traits.plant_height_cm} cm`);
-  }
-  if (traits.flower_size_cm !== undefined && traits.flower_size_cm !== null) {
-    lines.push(`花のサイズ　${traits.flower_size_cm} cm`);
-  }
-  return lines;
+  return traitEntries(traits).map((e) => `${e.label}　${e.text}`);
 }
 
 /**

@@ -9,8 +9,13 @@ import { initTasks, loadTasks } from './tasks.js';
 import { recordHarvest, recordSowing, recordGermination, localToday } from './record-actions.js';
 import { renderLineageCard, cardFileName } from './lineage-card.js';
 import { decodeCsvBytes, parseCsv, tableToRows } from './csv-import.js';
+import { initSeedExchange } from './seed-exchange.js';
+import { loadSegregation } from './segregation-view.js';
+import { readExifDate } from './exif-date.js';
 import { reencodePhoto } from './photo-image.js';
 import { planLabel } from './plan-label.js';
+import { fillGenreSelect, renderTraitFields, readTraitFields } from './trait-form.js';
+import { genreLabel } from './trait-spec.js';
 import { parsePlantParam, PLANT_PARAM } from './plant-link.js';
 
 const $ = (id) => document.getElementById(id);
@@ -131,6 +136,8 @@ async function openPendingPlant() {
 }
 
 // 「次の作業」の週1メールを受け取るか（PATCH /api/me）。失敗したらチェックを元に戻す
+$('btn-seg-to-plan').onclick = () => switchTab('ai');
+
 $('task-digest').onchange = async () => {
   const box = $('task-digest');
   box.disabled = true;
@@ -228,6 +235,7 @@ async function refreshSession() {
     initAi({ isSubscribed });
     initGermination({ isSubscribed, switchTab });
     initTasks({ onRecorded: () => loadCrossings() });
+    initSeedExchange();
     renderPlan();
     $('task-digest').checked = !!profile.task_digest;
     handleCheckoutReturn();
@@ -364,7 +372,7 @@ async function loadPlants() {
     }
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = [p.species, p.origin_sowing_id ? '自家実生' : '導入株']
+    meta.textContent = [genreLabel(p.genre), p.species, p.origin_sowing_id ? '自家実生' : '導入株']
       .filter(Boolean)
       .join(' / ');
     info.appendChild(meta);
@@ -429,6 +437,7 @@ async function loadPlants() {
 // ---- 個体編集 -------------------------------------------------------------
 
 let editingPlantId = null;
+let editingTraits = {}; // 編集中の個体の特性（ジャンルを変えても、今のジャンルに無い項目の値を消さない）
 
 function openPlantEdit(p) {
   editingPlantId = p.id;
@@ -439,12 +448,9 @@ function openPlantEdit(p) {
   $('edit-plant-visibility').value = p.visibility ?? 'private';
   $('edit-plant-notes').value = p.notes ?? '';
   $('edit-plant-in-gallery').checked = !!p.in_gallery;
-  const t = p.traits ?? {};
-  $('edit-plant-bloom-season').value = t.bloom_season ?? '';
-  $('edit-plant-fragrance-strength').value = t.fragrance_strength ?? '';
-  $('edit-plant-fragrance-type').value = t.fragrance_type ?? '';
-  $('edit-plant-height-cm').value = t.plant_height_cm ?? '';
-  $('edit-plant-flower-size-cm').value = t.flower_size_cm ?? '';
+  editingTraits = p.traits ?? {};
+  $('edit-plant-genre').value = p.genre ?? '';
+  renderTraitFields($('edit-plant-traits'), p.genre, editingTraits);
   show('plant-edit-card', true);
   reveal($('plant-edit-card'));
   $('plant-edit-card').scrollIntoView({ behavior: 'smooth' });
@@ -464,7 +470,8 @@ $('btn-save-plant').onclick = async () => {
       visibility: $('edit-plant-visibility').value,
       notes: $('edit-plant-notes').value.trim() || null,
       in_gallery: $('edit-plant-in-gallery').checked,
-      traits: collectTraits('edit-plant-'),
+      genre: $('edit-plant-genre').value || null,
+      traits: readTraitFields($('edit-plant-traits'), editingTraits),
     });
     show('plant-edit-success', true);
     await loadPlants();
@@ -484,34 +491,23 @@ function reveal(el) {
   el.classList.add('revealing');
 }
 
-// 構造化フィールド → traits オブジェクト。空欄はキーごと含めない。
-// 未知キーが将来増えても壊れないよう、ここは既知キーだけを素直に組み立てる。
-// prefix で登録フォーム（'plant-'）と編集フォーム（'edit-plant-'）を共用する。
-function collectTraits(prefix) {
-  const val = (suffix) => $(`${prefix}${suffix}`).value;
-  const traits = {};
-  const bloom = val('bloom-season');
-  if (bloom) traits.bloom_season = bloom;
-  const strength = val('fragrance-strength');
-  if (strength !== '') traits.fragrance_strength = Number(strength);
-  const fragType = val('fragrance-type').trim();
-  if (fragType) traits.fragrance_type = fragType;
-  const height = val('height-cm');
-  if (height !== '') traits.plant_height_cm = Number(height);
-  const flower = val('flower-size-cm');
-  if (flower !== '') traits.flower_size_cm = Number(flower);
-  return traits;
-}
+// ジャンルを選ぶと、そのジャンルの特性の入力欄に作り直す（入力中の値は残す）
+fillGenreSelect($('plant-genre'));
+fillGenreSelect($('edit-plant-genre'));
+renderTraitFields($('plant-traits'), null);
+$('plant-genre').onchange = () =>
+  renderTraitFields($('plant-traits'), $('plant-genre').value, readTraitFields($('plant-traits')));
+$('edit-plant-genre').onchange = () => {
+  editingTraits = readTraitFields($('edit-plant-traits'), editingTraits);
+  renderTraitFields($('edit-plant-traits'), $('edit-plant-genre').value, editingTraits);
+};
 
 function resetPlantForm() {
   $('plant-name').value = '';
   $('plant-species').value = '';
   $('plant-notes').value = '';
-  $('plant-bloom-season').value = '';
-  $('plant-fragrance-strength').value = '';
-  $('plant-fragrance-type').value = '';
-  $('plant-height-cm').value = '';
-  $('plant-flower-size-cm').value = '';
+  // ジャンルは続けて同じものを登録することが多いので残し、特性だけ空にする
+  renderTraitFields($('plant-traits'), $('plant-genre').value);
 }
 
 $('btn-create-plant').onclick = async () => {
@@ -523,7 +519,8 @@ $('btn-create-plant').onclick = async () => {
     };
     if ($('plant-species').value.trim()) body.species = $('plant-species').value;
     if ($('plant-notes').value.trim()) body.notes = $('plant-notes').value;
-    const traits = collectTraits('plant-');
+    if ($('plant-genre').value) body.genre = $('plant-genre').value;
+    const traits = readTraitFields($('plant-traits'));
     if (Object.keys(traits).length) body.traits = traits;
     await api.createPlant(body);
     resetPlantForm();
@@ -644,12 +641,13 @@ $('btn-lineage-card').onclick = async () => {
 };
 
 // 写真 1 枚を個体に保存する（行の作成 → 本体の PUT）。
-async function savePhoto(plantId, file, caption) {
+async function savePhoto(plantId, file, caption, takenAt) {
   // 端末の中で描き直して JPEG にし、位置情報などのメタデータを落としてから送る（photo-image.js）
   const jpeg = await reencodePhoto(file);
   const { upload } = await api.createPhoto(plantId, {
     content_type: 'image/jpeg',
     caption: caption || undefined,
+    taken_at: takenAt || undefined,
   });
   // Worker が返したアップロード先（PUT /api/photos/:id）へ本体を送る（R2 への保存は Worker が行う）
   await api.uploadPhoto(upload, jpeg);
@@ -667,6 +665,38 @@ $('btn-upload-photo').onclick = async () => {
   } catch (e) {
     setError('detail-error', e);
   }
+};
+
+// 写真のまとめ取り込み（SNS などから端末に保存した写真）。撮影日は Exif から読み（描き直す前に）、
+// 無ければ指定の日付。1 枚ずつ順に送り、失敗した枚数を最後に出す（途中で止めない）
+const BULK_PHOTO_MAX = 30;
+$('btn-bulk-photos').onclick = async () => {
+  setError('detail-error', null);
+  const plantId = $('detail-card').dataset.plantId;
+  const files = [...$('bulk-photo-files').files];
+  if (!plantId) return setError('detail-error', new Error('個体を開き直してください。'));
+  if (files.length === 0) return setError('detail-error', new Error('写真を選んでください。'));
+  if (files.length > BULK_PHOTO_MAX) {
+    return setError('detail-error', new Error(`一度に追加できるのは ${BULK_PHOTO_MAX} 枚までです。`));
+  }
+  const fallback = $('bulk-photo-date').value || undefined;
+  $('btn-bulk-photos').disabled = true;
+  let failed = 0;
+  for (const [i, file] of files.entries()) {
+    $('bulk-photo-progress').textContent = `${i + 1} / ${files.length} 枚目を追加しています…`;
+    try {
+      const takenAt = readExifDate(await file.arrayBuffer()) ?? fallback;
+      await savePhoto(plantId, file, '', takenAt);
+    } catch {
+      failed++;
+    }
+  }
+  $('bulk-photo-progress').textContent = failed
+    ? `${files.length - failed} 枚を追加しました（${failed} 枚は追加できませんでした）。`
+    : `${files.length} 枚を追加しました。`;
+  $('bulk-photo-files').value = '';
+  $('btn-bulk-photos').disabled = false;
+  await openDetail(plantId);
 };
 
 // 撮影して記録: 撮った時点で保存する（ボタンを押し直させない。手が汚れている現場向け）。
@@ -712,7 +742,7 @@ async function loadCrossings() {
   // 発芽率の集計と「次の作業」は交配記録の変更に追従させる
   // （失敗しても一覧の表示は止めない。エラーはそれぞれのカードに出る＝この 2 つは reject しない）。
   // 最後に待つ: QR の直リンクで個体を開くとき、上のカードが後から伸びてスクロール位置がずれないように
-  const sideCards = Promise.all([loadGermination(), loadTasks()]);
+  const sideCards = Promise.all([loadGermination(), loadTasks(), loadSegregation(isSubscribed())]);
   const { crossings } = await api.listCrossings();
   const list = $('crossing-list');
   list.replaceChildren();

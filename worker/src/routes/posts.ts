@@ -24,7 +24,10 @@ import {
 //     posts.visibility の既定 public / plants の既定 private の非対称があるため、
 //     ここを post の可視性で代用すると非公開の交配・親個体が公開 post 経由で漏れる。
 
-const POST_COLS = 'id, user_id, crossing_id, content, visibility, created_at, updated_at';
+// 交換の希望（0007）の列も含める。exchange_use_by は ::text で YYYY-MM-DD のまま返す
+export const POST_COLS = `id, user_id, crossing_id, content, visibility, created_at, updated_at,
+  exchange_type, exchange_status, exchange_kind, exchange_label, exchange_species,
+  exchange_use_by::text as exchange_use_by, seed_stock_id`;
 
 // POST /api/posts — 投稿作成。
 // Request: { content(必須), crossing_id?, visibility? }
@@ -403,6 +406,18 @@ export async function serializePosts(
       // F6: 不可視の crossing は crossing_id ごと伏せる（null と区別できない形にする）
       crossing: p.crossing_id
         ? expandedByCrossingId.get(p.crossing_id as string) ?? null
+        : null,
+      // 交換の希望（0007）。在庫は所有者のみのデータなので、seed_stock_id は本人にだけ返す
+      exchange: p.exchange_type
+        ? {
+            type: p.exchange_type,
+            status: p.exchange_status,
+            kind: p.exchange_kind ?? null,
+            label: p.exchange_label,
+            species: p.exchange_species ?? null,
+            use_by: p.exchange_use_by ?? null,
+            ...(p.user_id === viewerId ? { seed_stock_id: p.seed_stock_id ?? null } : {}),
+          }
         : null,
     };
   });

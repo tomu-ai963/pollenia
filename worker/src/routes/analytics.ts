@@ -9,12 +9,15 @@ import {
   type SowingWithParents,
 } from '../lib/germination';
 import { ANALYTICS_MAX_SOWINGS } from '../constants';
+import { summarizeOffspring } from '../lib/segregation';
+import { traitEntries } from '../../../frontend/src/trait-spec.js';
 
 // 発芽率の集計 API。交配・採種・播種は所有者のみのデータ（datamodel.md）なので、
 // すべてのクエリを検証済み uid で絞る（他人の記録は集計にも名前にも出ない）。
 //
 // - GET /api/analytics/germination          … 交配ごと + 全体（無料）
 // - GET /api/analytics/germination/parents  … 親個体ごとの比較（有料。未加入は 402）
+// - GET /api/analytics/segregation          … 交配ごとの形質の分離（有料。未加入は 402）
 
 // 自分の播種を、交配の両親 ID と一緒に引く（新しい播種から ANALYTICS_MAX_SOWINGS 件まで）。
 // 発芽までの日数は SQL の date 同士の差（整数の日数）で出す。
@@ -96,5 +99,60 @@ export async function handleGerminationByParent(sql: Sql, user: AuthedUser): Pro
   );
   return json({
     parents: parents.map((p) => ({ ...p, name: names.get(p.plant_id) ?? null })),
+  });
+}
+
+// GET /api/analytics/segregation — 交配ごとの形質の分離（有料）。
+// 子 = 自分の未削除の個体のうち、その交配の播種から生まれたもの（plants.origin_sowing_id）。
+// 子が 1 本以上いる交配だけを、新しい交配から返す。両親の特性も比べるために添える（自分の個体だけ）。
+export async function handleSegregation(sql: Sql, user: AuthedUser): Promise<Response> {
+  const sub = await requireActiveSubscription(sql, user.uid);
+  if (!sub.ok) return sub.response;
+
+  const uid = user.uid;
+  const rows = await sql`
+    select c.id as crossing_id, c.seed_parent_id, c.pollen_parent_id, c.cross_date::text as cross_date,
+           c.created_at as crossing_created_at, p.traits
+    from pollenia.plants p
+    join pollenia.sowings s on s.id = p.origin_sowing_id and s.user_id = ${uid}::uuid
+    join pollenia.seed_harvests h on h.id = s.seed_harvest_id and h.user_id = ${uid}::uuid
+    join pollenia.crossings c on c.id = h.crossing_id and c.user_id = ${uid}::uuid
+    where p.user_id = ${uid}::uuid and p.deleted_at is null
+    order by c.created_at desc
+    limit ${ANALYTICS_MAX_SOWINGS}
+  `;
+
+  const byCrossing = new Map<string, { row: (typeof rows)[number]; traits: unknown[] }>();
+  for (const r of rows) {
+    const e = byCrossing.get(r.crossing_id as string);
+    if (e) e.traits.push(r.traits);
+    else byCrossing.set(r.crossing_id as string, { row: r, traits: [r.traits] });
+  }
+
+  const parentIds = [
+    ...new Set(rows.flatMap((r) => [r.seed_parent_id, r.pollen_parent_id]).filter((x): x is string => !!x)),
+  ];
+  const parents = parentIds.length
+    ? await sql`
+        select id, name, traits from pollenia.plants
+        where id = any(${uuidArrayLiteral(parentIds)}::uuid[]) and user_id = ${uid}::uuid
+      `
+    : [];
+  const parentById = new Map(parents.map((p) => [p.id as string, p]));
+  const parentOf = (id: unknown) => {
+    const p = id ? parentById.get(id as string) : undefined;
+    return p ? { id: p.id, name: p.name, traits: traitEntries(p.traits) } : null;
+  };
+
+  return json({
+    crossings: [...byCrossing.values()].map(({ row, traits }) => ({
+      crossing_id: row.crossing_id,
+      cross_date: row.cross_date,
+      self: !!row.pollen_parent_id && row.pollen_parent_id === row.seed_parent_id,
+      seed_parent: parentOf(row.seed_parent_id),
+      pollen_parent: parentOf(row.pollen_parent_id),
+      offspring: traits.length,
+      traits: summarizeOffspring(traits),
+    })),
   });
 }

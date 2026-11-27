@@ -43,3 +43,6 @@ paths: ["worker/src/**/*.ts"]
    配信停止リンクは uid への HMAC 署名（DEVICE_AUTH_SECRET から HKDF で用途別に派生。`lib/digest.ts`）で、
    GET は確認ページだけ・停止は POST（リンクの先読みで止まらない）。署名が合わなければ何もしない。
    ログに宛先・本文（個体名）を出さない（MOCK_MAIL でも件名と行数だけ）
+15. 種・花粉の在庫（`seed_stocks`）は所有者のみのデータ。交換の希望（`posts.exchange_*`）は在庫から
+   その時点の名前・種類・属種・期限だけをコピーして公開し、`seed_stock_id` は本人にだけ返す（`serializePosts`）。
+   「譲ります」は本人の在庫だけ・`confirm_variety: true`（登録品種でない／許諾ありの確認。種苗法）を必須にする

@@ -12,22 +12,21 @@
 
 import { MAX_NAME_LEN, MAX_TEXT_LEN } from '../constants';
 import { parsePlantTraits } from './traits';
+import { GENRES, TRAITS } from '../../../frontend/src/trait-spec.js';
 import { asDateStr, asText } from './validate';
 
 export const IMPORT_MAX_ROWS = 500;
 
+/** 1 行。特性は trait-spec.js の key（bloom_season など）で入る。genre は「バラ」などの表示名か値 */
 export interface ImportRow {
   name?: unknown;
   species?: unknown;
+  genre?: unknown;
   mother?: unknown;
   father?: unknown;
   cross_date?: unknown;
   notes?: unknown;
-  bloom_season?: unknown;
-  fragrance_strength?: unknown;
-  fragrance_type?: unknown;
-  plant_height_cm?: unknown;
-  flower_size_cm?: unknown;
+  [traitKey: string]: unknown;
 }
 
 export interface ExistingPlant {
@@ -40,6 +39,7 @@ export interface NewPlant {
   key: string;
   name: string;
   species: string | null;
+  genre: string | null;
   notes: string | null;
   traits: Record<string, unknown>;
   row: number | null;
@@ -63,13 +63,6 @@ export interface ImportError {
   message: string;
 }
 
-const BLOOM_JA: Record<string, string> = {
-  春: 'spring',
-  初夏: 'early_summer',
-  夏: 'summer',
-  秋: 'autumn',
-  冬: 'winter',
-};
 const UNKNOWN_FATHER = new Set(['', '不明', '父不明', '?', '？']);
 const SELF = new Set(['自家', '自家受粉', '自殖']);
 
@@ -83,45 +76,35 @@ export function normalizeDate(v: unknown): string | null {
   return asDateStr(`${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`);
 }
 
-function num(v: unknown): number | null | 'invalid' {
-  const s = str(v);
-  if (s === '') return null;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 'invalid';
-}
-
-/** 特性の欄 → traits（parsePlantTraits で検証） */
+/** 特性の欄 → traits。選択肢は表示名（「初夏」「四季咲き」）でも値でもよい。数値は文字から数にする */
 function parseTraits(r: ImportRow): { ok: true; value: Record<string, unknown> } | { ok: false; field: string } {
   const t: Record<string, unknown> = {};
-  const bloom = str(r.bloom_season);
-  if (bloom) {
-    const v = BLOOM_JA[bloom] ?? bloom;
-    t.bloom_season = v;
+  for (const spec of TRAITS) {
+    const raw = str(r[spec.key]);
+    if (!raw) continue;
+    if (spec.type === 'enum') {
+      t[spec.key] = spec.values?.find((o) => o.label === raw || o.value === raw)?.value ?? raw;
+    } else if (spec.type === 'int' || spec.type === 'number') {
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return { ok: false, field: spec.label };
+      t[spec.key] = n;
+    } else {
+      t[spec.key] = raw;
+    }
   }
-  for (const [key, field] of [
-    ['fragrance_strength', '香りの強さ'],
-    ['plant_height_cm', '草丈'],
-    ['flower_size_cm', '花のサイズ'],
-  ] as const) {
-    const n = num(r[key]);
-    if (n === 'invalid') return { ok: false, field };
-    if (n !== null) t[key] = n;
-  }
-  const fragType = str(r.fragrance_type);
-  if (fragType) t.fragrance_type = fragType;
   const parsed = parsePlantTraits(t);
   if (!parsed.ok) {
-    const bad = Object.keys(t).find((k) => !parsePlantTraits({ [k]: t[k] }).ok) ?? '';
-    const label: Record<string, string> = {
-      bloom_season: '開花時期',
-      fragrance_strength: '香りの強さ',
-      fragrance_type: '香りの系統',
-      plant_height_cm: '草丈',
-      flower_size_cm: '花のサイズ',
-    };
-    return { ok: false, field: label[bad] ?? '特性' };
+    const bad = TRAITS.find((spec) => spec.key in t && !parsePlantTraits({ [spec.key]: t[spec.key] }).ok);
+    return { ok: false, field: bad?.label ?? '特性' };
   }
   return { ok: true, value: parsed.value };
+}
+
+/** 「バラ」などの表示名か値 → ジャンルの値。空は null、知らないものは undefined（エラー） */
+function parseGenre(v: unknown): string | null | undefined {
+  const s = str(v);
+  if (!s) return null;
+  return GENRES.find((g) => g.label === s || g.value === s)?.value;
 }
 
 export function planImport(
@@ -146,6 +129,7 @@ export function planImport(
     row: number;
     name: string;
     species: string | null;
+    genre: string | null;
     notes: string | null;
     traits: Record<string, unknown>;
     mother: string | null;
@@ -174,6 +158,10 @@ export function planImport(
     if (notesRaw && !notes) return errors.push({ row, message: 'メモが長すぎます。' });
     const traits = parseTraits(r);
     if (!traits.ok) return errors.push({ row, message: `${traits.field}の値が正しくありません。` });
+    const genre = parseGenre(r.genre);
+    if (genre === undefined) {
+      return errors.push({ row, message: `ジャンルは ${GENRES.map((g) => g.label).join('・')} のどれかです。` });
+    }
 
     const motherRaw = str(r.mother);
     const fatherRaw = str(r.father);
@@ -199,6 +187,7 @@ export function planImport(
       row,
       name,
       species,
+      genre,
       notes,
       traits: traits.value,
       mother,
@@ -214,6 +203,7 @@ export function planImport(
     key: `new:${p.name}`,
     name: p.name,
     species: p.species,
+    genre: p.genre,
     notes: p.notes,
     traits: p.traits,
     row: p.row,
@@ -232,6 +222,7 @@ export function planImport(
         key: `new:${parentName}`,
         name: parentName,
         species: null,
+        genre: null,
         notes: null,
         traits: {},
         row: null,

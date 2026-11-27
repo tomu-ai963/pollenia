@@ -75,8 +75,8 @@ describe('traitLines', () => {
   it('記録のある特性だけを載せる（0 も載せる）', () => {
     expect(traitLines({ bloom_season: 'early_summer', fragrance_strength: 0, flower_size_cm: 8.5 })).toEqual([
       '開花時期　初夏',
-      '香りの強さ　0 / 5',
       '花のサイズ　8.5 cm',
+      '香りの強さ　0 / 5',
     ]);
     expect(traitLines({})).toEqual([]);
     expect(traitLines()).toEqual([]);

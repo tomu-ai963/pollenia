@@ -35,10 +35,17 @@ import {
 } from './routes/records';
 import { handleGetLineage } from './routes/lineage';
 import { handlePublicGallery, handlePublicPlant } from './routes/public';
-import { handleGerminationByCrossing, handleGerminationByParent } from './routes/analytics';
+import { handleGerminationByCrossing, handleGerminationByParent, handleSegregation } from './routes/analytics';
 import { handleListTasks, handleUpdateTask } from './routes/tasks';
 import { handleImportPlants } from './routes/import';
 import { handleUnsubscribe } from './routes/unsubscribe';
+import {
+  handleCreateSeedStock,
+  handleDeleteSeedStock,
+  handleListSeedStocks,
+  handleUpdateSeedStock,
+} from './routes/seed-stocks';
+import { handleCreateExchange, handleListExchange, handleUpdateExchange } from './routes/exchange';
 import { handleScheduled } from './scheduled';
 import {
   handleCreateComment,
@@ -92,6 +99,9 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //     - POST /api/ai/consult、POST /api/ai/listing
 //   Phase 4（課金。Stripe 月額サブスク ¥300/月）
 //     - POST /api/billing/checkout、POST /api/billing/portal
+//   種・花粉の在庫（routes/seed-stocks.ts。所有者のみ）と交換の希望（routes/exchange.ts。投稿の一種）
+//     - GET/POST /api/seed-stocks、PATCH/DELETE /api/seed-stocks/:id
+//     - GET/POST /api/exchange、PATCH /api/exchange/:post_id（受付中・終了）
 //   過去の記録の取り込み（routes/import.ts）
 //     - POST /api/import/plants?dry_run=1   … CSV を画面で読んだ行（最大 500）。dry_run はプレビュー
 //   次の作業（routes/tasks.ts。記録の状態から導く）
@@ -99,6 +109,7 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //   発芽率の集計（routes/analytics.ts）
 //     - GET  /api/analytics/germination          … 交配ごと + 全体（無料）
 //     - GET  /api/analytics/germination/parents  … 親個体ごとの比較（有料ゲート）
+//     - GET  /api/analytics/segregation          … 交配ごとの形質の分離（有料ゲート）
 //
 // 状態を変えるメソッド（POST/PUT/PATCH/DELETE）は workers-auth の middleware が Origin と
 // CSRF 二重送信トークン（__Host-csrf Cookie ↔ x-csrf-token ヘッダ）を確かめる。
@@ -269,6 +280,32 @@ async function route(
 
   // --- Phase 3: AI -----------------------------------------------------------
 
+  if (pathname === '/api/seed-stocks') {
+    if (req.method === 'GET') return handleListSeedStocks(sql, user);
+    if (req.method === 'POST') return handleCreateSeedStock(req, sql, user);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  const seedStockById = pathname.match(/^\/api\/seed-stocks\/([^/]+)$/);
+  if (seedStockById) {
+    const id = decodeURIComponent(seedStockById[1]);
+    if (req.method === 'PATCH') return handleUpdateSeedStock(req, sql, user, id);
+    if (req.method === 'DELETE') return handleDeleteSeedStock(sql, user, id);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  if (pathname === '/api/exchange') {
+    if (req.method === 'GET') return handleListExchange(req, sql, user);
+    if (req.method === 'POST') return handleCreateExchange(req, sql, user);
+    return errorResponse('METHOD_NOT_ALLOWED');
+  }
+
+  const exchangeById = pathname.match(/^\/api\/exchange\/([^/]+)$/);
+  if (exchangeById) {
+    if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleUpdateExchange(req, sql, user, decodeURIComponent(exchangeById[1]));
+  }
+
   if (pathname === '/api/import/plants') {
     if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
     return handleImportPlants(req, sql, user);
@@ -283,6 +320,11 @@ async function route(
   if (taskById) {
     if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
     return handleUpdateTask(req, sql, user, decodeURIComponent(taskById[1]), decodeURIComponent(taskById[2]));
+  }
+
+  if (pathname === '/api/analytics/segregation') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleSegregation(sql, user);
   }
 
   if (pathname === '/api/analytics/germination') {

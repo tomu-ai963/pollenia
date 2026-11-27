@@ -641,3 +641,23 @@ a.button-link {
 
 /* 押せないボタンは見た目でも分かるように（これまでは押せるときと同じ見た目だった） */
 button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* 形質の分離（記録タブ） */
+.seg-crossing { padding: 0.6rem 0; border-bottom: 1px solid var(--line-soft); }
+.seg-crossing:last-child { border-bottom: none; }
+.seg-crossing .meta { font-size: 0.76rem; color: var(--muted); }
+.seg-table { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.8rem; margin: 0.4rem 0 0; font-size: 0.86rem; }
+.seg-table dt { color: var(--muted); }
+.seg-table dd { margin: 0; }
+
+/* 種・花粉の在庫と交換 */
+.stock-item .meta.expired { color: #b94a48; }
+.offer-form { margin: 0 0 0.8rem; padding: 0.6rem 0.8rem; border-radius: 12px; background: var(--bg, #fdf8ec); }
+.success-text:empty { display: none; }
+.segmented { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.4rem 0 0.6rem; }
+.segmented .active { background: var(--mint); color: var(--mint-ink); }
+.exchange-box { margin: 0.4rem 0; padding: 0.5rem 0.7rem; border-radius: 12px; background: var(--mint); }
+.exchange-box.want { background: #fbe3e8; }
+.exchange-box .meta { font-size: 0.76rem; color: var(--muted); }
+.exchange-status { margin-left: 0.5rem; font-size: 0.72rem; padding: 0.05rem 0.5rem; border-radius: 999px; background: #fff; }
+.exchange-status.closed { color: var(--muted); }

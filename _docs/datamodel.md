@@ -75,6 +75,14 @@ profiles ──┬─ plants ──────────┐
   public より公開の範囲が広がるため、個体ごとに本人が選ぶ。載る条件は visibility = public と組み合わせて
   Worker が判定する（public でなくなれば in_gallery のままでも載らない）。
 
+## ジャンル・在庫・交換（0007_genre_seed_exchange.sql）
+
+- `plants.genre`: 入力する特性の項目を切り替えるだけ。項目の定義はコードの側（`frontend/src/trait-spec.js`）に置き、
+  traits は jsonb のまま（項目を足すのにマイグレーションが要らない）。
+- `seed_stocks`: 種・花粉の在庫。所有者のみ（visibility なし）。交配（自分の）に任意でつなげる。
+- 交換の希望は posts に `exchange_*` 列を足した（別テーブルにすると、コメント・いいね・公開範囲の判定を作り直すことになる）。
+  在庫は所有者のみなので、公開する内容は投稿へのコピー。在庫を消しても投稿は残る（`seed_stock_id` は set null）。
+
 ## 将来の拡張候補（今はやらない）
 
 - species マスタテーブル化・タグ

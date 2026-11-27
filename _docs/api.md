@@ -159,6 +159,20 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
 - 新しい写真の順に `GALLERY_PAGE_SIZE` 件ずつ。offset は `GALLERY_MAX_OFFSET` でクランプし、
   次のページがあれば `next_offset`。`Cache-Control: public, max-age=60`（公開系統ページと同じ）。
 
+## ジャンル・形質の分離・種と花粉の在庫と交換・写真のまとめ取り込み（0007）
+
+- **ジャンル**: `plants.genre`（rose / hellebore / succulent / vegetable / other。null = 未設定）。
+  特性の項目は `frontend/src/trait-spec.js`（画面と Worker が共有。`lib/traits.ts` の検証・AI の文・系統カード・
+  CSV 取り込み・形質の分離がすべてここから作る）。ジャンルと項目の組み合わせは縛らない（ジャンルを変えても値は消さない）。
+- **形質の分離**（有料）: `GET /api/analytics/segregation`。交配ごとに子（`origin_sowing_id` でつながる自分の未削除の個体）の
+  特性を数える（選択肢・文字は値ごとの本数、数値は最小・最大・平均）。両親の特性も添える。
+- **種・花粉の在庫**（所有者のみ）: `GET/POST /api/seed-stocks`、`PATCH/DELETE /api/seed-stocks/:id`。
+- **交換の希望**（投稿の一種・public）: `GET /api/exchange?type=offer|want`、`POST /api/exchange`、
+  `PATCH /api/exchange/:post_id`（受付中・終了。本人だけ）。「譲ります」は本人の在庫から作り、その時点の内容をコピーする。
+  `confirm_variety: true`（種苗法の確認）が必須。期限切れ・数量 0 の在庫は出せない。やりとりは投稿のコメントで。
+- **写真のまとめ取り込み**: 画面だけ（既存の `POST /api/plants/:id/photos` を 1 枚ずつ）。撮影日は Exif（`frontend/src/exif-date.js`）、
+  無ければ指定の日付を `taken_at` に。
+
 ## 過去の記録の取り込み（routes/import.ts。セッション + profiles 行を要求）
 
 | Method | Path | 内容 |

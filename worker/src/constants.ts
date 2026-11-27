@@ -125,3 +125,6 @@ export const GALLERY_MAX_OFFSET = 480;
 export const DIGEST_MAX_PER_RUN = 300;
 // メール内のリンクの起点（cron にはリクエストが無いので固定。wrangler.toml の APP_ORIGIN が優先）
 export const APP_ORIGIN_DEFAULT = 'https://pollenia.tomu-ai.dev';
+
+// 種・花粉の交換の希望（GET /api/exchange）の 1 ページの件数。
+export const EXCHANGE_PAGE_SIZE = 20;

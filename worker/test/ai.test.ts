@@ -148,7 +148,7 @@ describe('embeddings', () => {
     const p = new MockEmbeddingProvider();
     const [q, similar, other] = await p.embed([
       '香りの強い個体はどれ？',
-      '【個体】バラA / 特性: 香りの強さ=5/5, 香りの系統=ダマスク',
+      '【個体】バラA / 特性: 香りの強さ=5 / 5, 香りの系統=ダマスク',
       '【播種】交配 X × Y の種子を播種 / 播種数: 20粒',
     ]);
     const cos = (a: number[], b: number[]) => a.reduce((s, v, i) => s + v * b[i], 0);

@@ -1,3 +1,5 @@
+import { TRAITS } from './trait-spec.js';
+
 // 過去の記録の取り込み（CSV）。読み取り・見出しの対応づけはここ（端末内）で行い、
 // 検証と作成は Worker（POST /api/import/plants）が行う。
 
@@ -53,18 +55,17 @@ export function parseCsv(text) {
   return rows.filter((r) => r.some((c) => c.trim() !== ''));
 }
 
-// 見出し → API の項目名。括弧の中（「（cm）」「（種子親）」など）と空白は無視して比べる
+// 見出し → API の項目名。括弧の中（「（cm）」「（種子親）」など）と空白は無視して比べる。
+// 特性の見出しは trait-spec.js の項目名（「開花時期」「花形」など）と key
 const HEADERS = {
   name: ['名前', '個体名', 'name'],
   species: ['属・種', '属種', '種', '品種', 'species'],
+  genre: ['ジャンル', 'genre'],
   mother: ['母', '種子親', '母木', 'mother', 'seed_parent'],
   father: ['父', '花粉親', 'father', 'pollen_parent'],
   cross_date: ['交配日', 'cross_date'],
   notes: ['メモ', '備考', 'notes'],
-  bloom_season: ['開花時期', 'bloom_season'],
-  fragrance_strength: ['香りの強さ', 'fragrance_strength'],
-  fragrance_type: ['香りの系統', 'fragrance_type'],
-  plant_height_cm: ['草丈', 'plant_height_cm'],
+  ...Object.fromEntries(TRAITS.map((t) => [t.key, [t.label, t.key]])),
   flower_size_cm: ['花のサイズ', '花径', 'flower_size_cm'],
 };
 

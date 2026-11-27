@@ -49,8 +49,8 @@ export async function handleImportPlants(req: Request, sql: Sql, user: AuthedUse
 
     for (const p of plan.plants) {
       const [row] = await tx`
-        insert into pollenia.plants (user_id, name, species, visibility, notes, traits)
-        values (${user.uid}::uuid, ${p.name}, ${p.species}, 'private', ${p.notes},
+        insert into pollenia.plants (user_id, name, species, genre, visibility, notes, traits)
+        values (${user.uid}::uuid, ${p.name}, ${p.species}, ${p.genre}, 'private', ${p.notes},
                 ${tx.json(p.traits as Record<string, string | number>)})
         returning id
       `;
