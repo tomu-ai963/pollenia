@@ -32,7 +32,10 @@ describe('limitPerUser', () => {
 
 describe('ルートと設定', () => {
   const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8');
-  const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+  // core.autocrlf=true の checkout では CRLF になる（正規表現の . は  を含まないので LF にそろえる）
+  const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8').replace(/
+/g, '
+');
 
   it.each([
     ['IMPORT_LIMITER', "pathname === '/api/import/plants'"],
