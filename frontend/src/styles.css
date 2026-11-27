@@ -296,6 +296,11 @@ select:disabled { cursor: not-allowed; background: var(--line-soft); }
   margin-top: 0.5rem;
 }
 .notice { color: var(--muted); font-size: 0.85rem; }
+
+/* ログイン欄の紹介文（geo/sync.mjs が index.html に書き込む。文面は geo/geo.config.json の tagline・intro） */
+.intro { margin-bottom: 1rem; padding-bottom: 0.9rem; border-bottom: 1px dashed var(--line); }
+.intro-lead { margin: 0 0 0.5rem; font-weight: 500; }
+.intro-list { margin: 0; padding-left: 1.2rem; color: var(--ink); font-size: 0.85rem; line-height: 1.7; }
 .notice.success { color: var(--mint-ink); font-weight: 500; margin-left: 0.5rem; }
 .notice.success::before { content: "✓ "; }
 .hidden { display: none; }

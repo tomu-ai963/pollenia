@@ -11,7 +11,8 @@
     "db:up": "node scripts/setup-local.mjs && docker compose -f ../docker-compose.yml --env-file ../.env up -d --wait",
     "db:down": "docker compose -f ../docker-compose.yml --env-file ../.env down",
     "db:reset": "docker compose -f ../docker-compose.yml --env-file ../.env down -v",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node scripts/migrate.mjs",
+    "geo": "node ../geo/geo-build.mjs ../geo/geo.config.json ../frontend --inject --headers=../frontend/_headers"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
