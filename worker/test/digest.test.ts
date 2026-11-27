@@ -224,3 +224,18 @@ describe('PATCH /api/me', () => {
     expect((await handleUpdateMe(patch({}), sql, user)).status).toBe(400);
   });
 });
+
+describe('cron の設定（wrangler.toml）', () => {
+  it('月曜に送り始め、同じ日（JST の月曜）のうちに毎時動いて、上限を超えた人・失敗した人を拾う', async () => {
+    const { readFileSync } = await import('node:fs');
+    const toml = readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
+    const crons = toml.match(/^crons = \[(.*)\]$/m)?.[1] ?? '';
+    expect(crons).toContain('"0 23 * * 0"');
+    expect(crons).toContain('"0 0-11 * * 1"');
+    // 追加の実行もすべて JST の月曜（同じ「今日」）に入る＝処理済みの印で二重に送らない
+    for (const h of [0, 11]) {
+      expect(todayJst(new Date(Date.UTC(2026, 10, 30, h, 0)))).toBe('2026-11-30');
+    }
+    expect(todayJst(new Date(Date.UTC(2026, 10, 29, 23, 0)))).toBe('2026-11-30');
+  });
+});
