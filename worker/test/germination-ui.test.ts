@@ -45,8 +45,7 @@ describe('画面', () => {
   });
 
   it('交配記録一覧から発芽数を入れられる（PATCH /api/sowings/:id）', () => {
-    const app = read('src/app.js');
-    expect(app).toContain("addGerm.textContent = '発芽を記録'");
-    expect(app).toMatch(/api\.updateSowing\(target\.id, patch\)/);
+    expect(read('src/app.js')).toContain("action('発芽を記録', () => recordGermination(target))");
+    expect(read('src/record-actions.js')).toMatch(/api\.updateSowing\(sowing\.id, patch\)/);
   });
 });

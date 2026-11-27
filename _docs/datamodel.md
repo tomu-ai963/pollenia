@@ -61,6 +61,14 @@ profiles ──┬─ plants ──────────┐
   （回/分・回/日）の count 元 + コスト把握。
 - どちらも RLS 有効・ポリシー無し（deny-all）を維持。PostgREST 非露出・Worker 経由のみ。
 
+## 次の作業（0004_next_tasks.sql）
+
+- 作業（採種・播種・発芽の確認）は別テーブルにせず、記録の状態から導く。次の記録を付ければ自然に消え、
+  作業と記録の二重管理にならない。
+- 足したのは任意の予定日（`crossings.expected_harvest_date` / `seed_harvests.planned_sowing_date` /
+  `sowings.expected_germination_date`）、種の使用期限（`seed_harvests.sow_by_date`）、
+  一覧から外した印（3表の `task_dismissed_at`。結実しなかった交配など。記録そのものは消さない）。
+
 ## 将来の拡張候補（今はやらない）
 
 - species マスタテーブル化・タグ

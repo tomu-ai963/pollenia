@@ -113,3 +113,6 @@ export const AI_LISTING_TITLE_MAX = 40;
 
 // 集計に使う播種の上限（新しい順）。1ユーザーの記録量として十分大きく、1リクエストの負荷の上限にもなる。
 export const ANALYTICS_MAX_SOWINGS = 5000;
+
+// 「次の作業」（GET /api/tasks）で、種類（採種・播種・発芽の確認）ごとに返す上限（新しい記録から）。
+export const TASKS_MAX_PER_KIND = 200;

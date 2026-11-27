@@ -5,6 +5,8 @@ import { renderAncestors, renderDescendants } from './lineage-render.js';
 import { initCommunity, openMyProfile, loadCrossingOptions } from './community.js';
 import { initAi, resetListingUi } from './ai.js';
 import { initGermination, loadGermination } from './germination.js';
+import { initTasks, loadTasks } from './tasks.js';
+import { recordHarvest, recordSowing, recordGermination } from './record-actions.js';
 import { reencodePhoto } from './photo-image.js';
 import { planLabel } from './plan-label.js';
 import { parsePlantParam, PLANT_PARAM } from './plant-link.js';
@@ -201,6 +203,7 @@ async function refreshSession() {
     initCommunity({ me: profile, switchTab });
     initAi({ isSubscribed });
     initGermination({ isSubscribed, switchTab });
+    initTasks({ onRecorded: () => loadCrossings() });
     renderPlan();
     handleCheckoutReturn();
     await Promise.all([loadPlants(), loadCrossings()]);
@@ -628,8 +631,10 @@ function sowingForGermination(c) {
 }
 
 async function loadCrossings() {
-  // 発芽率の集計は交配記録の変更に追従させる（失敗しても一覧の表示は止めない。エラーは集計カードに出る）
+  // 発芽率の集計と「次の作業」は交配記録の変更に追従させる
+  // （失敗しても一覧の表示は止めない。エラーはそれぞれのカードに出る）
   loadGermination();
+  loadTasks();
   const { crossings } = await api.listCrossings();
   const list = $('crossing-list');
   list.replaceChildren();
@@ -654,7 +659,7 @@ async function loadCrossings() {
         return `採種${h.seed_count ?? '?'}粒${sowings ? `（${sowings}）` : ''}`;
       })
       .join('、');
-    meta.textContent = [c.cross_date, harvestSummary].filter(Boolean).join(' — ');
+    meta.textContent = [c.cross_date?.slice(0, 10), harvestSummary].filter(Boolean).join(' — ');
     info.appendChild(meta);
     div.appendChild(info);
 
@@ -664,63 +669,27 @@ async function loadCrossings() {
     editCross.textContent = '編集';
     editCross.onclick = () => openCrossingEdit(c);
     btns.appendChild(editCross);
-    const addHarvest = document.createElement('button');
-    addHarvest.className = 'small ghost';
-    addHarvest.textContent = '採種を記録';
-    addHarvest.onclick = async () => {
-      const seedCount = prompt('採種数（粒）:');
-      if (seedCount === null) return;
-      await api.createHarvest(c.id, {
-        harvest_date: new Date().toISOString().slice(0, 10),
-        seed_count: Number(seedCount) || 0,
-      });
-      await loadCrossings();
-    };
-    btns.appendChild(addHarvest);
-    if (c.harvests.length > 0) {
-      const addSowing = document.createElement('button');
-      addSowing.className = 'small ghost';
-      addSowing.textContent = '播種を記録';
-      addSowing.onclick = async () => {
-        const count = prompt('播種数（粒）:');
-        if (count === null) return;
-        const latest = c.harvests[c.harvests.length - 1];
-        await api.createSowing(latest.id, {
-          sowing_date: new Date().toISOString().slice(0, 10),
-          sowing_count: Number(count) || 0,
-        });
-        await loadCrossings();
-      };
-      btns.appendChild(addSowing);
-    }
-    const target = sowingForGermination(c);
-    if (target) {
-      const addGerm = document.createElement('button');
-      addGerm.className = 'small ghost';
-      addGerm.textContent = '発芽を記録';
-      addGerm.onclick = async () => {
+    // 採種・播種・発芽の記録（record-actions.js。「次の作業」と共通）
+    const action = (label, fn) => {
+      const b = document.createElement('button');
+      b.className = 'small ghost';
+      b.textContent = label;
+      b.onclick = async () => {
         setError('crossing-error', null);
-        const label = `${target.sowing_date ?? '日付なし'}にまいた${target.sowing_count ?? '?'}粒`;
-        const input = prompt(`発芽数（${label}）:`, target.germination_count ?? '');
-        if (input === null) return;
-        const count = Number(input);
-        if (input.trim() === '' || !Number.isInteger(count) || count < 0) {
-          return setError('crossing-error', new Error('発芽数は 0 以上の整数で入力してください。'));
-        }
-        const patch = { germination_count: count };
-        // 初発芽日が未記録なら今日にする（発芽までの日数の集計に使う）
-        if (count > 0 && !target.first_germination_date) {
-          patch.first_germination_date = new Date().toISOString().slice(0, 10);
-        }
         try {
-          await api.updateSowing(target.id, patch);
-          await loadCrossings();
+          if (await fn()) await loadCrossings();
         } catch (e) {
           setError('crossing-error', e);
         }
       };
-      btns.appendChild(addGerm);
+      btns.appendChild(b);
+    };
+    action('採種を記録', () => recordHarvest(c.id));
+    if (c.harvests.length > 0) {
+      action('播種を記録', () => recordSowing(c.harvests[c.harvests.length - 1].id));
     }
+    const target = sowingForGermination(c);
+    if (target) action('発芽を記録', () => recordGermination(target));
 
     // 削除（物理削除・カスケード）。紐づく採種・播種があれば件数を明示して警告する。
     const del = document.createElement('button');
@@ -791,7 +760,8 @@ function openCrossingEdit(c) {
   $('edit-cross-seed').value = c.seed_parent_id;
   $('edit-cross-self').checked = !!isSelf;
   $('edit-cross-pollen').value = isSelf ? '' : (c.pollen_parent_id ?? '');
-  $('edit-cross-date').value = c.cross_date ?? '';
+  // API は date を日時（…T00:00:00.000Z）で返す。そのままだと date 入力欄が空になり、保存で交配日が消える
+  $('edit-cross-date').value = c.cross_date?.slice(0, 10) ?? '';
   $('edit-cross-notes').value = c.notes ?? '';
   applySelfState('edit-cross');
   show('crossing-edit-card', true);

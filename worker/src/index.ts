@@ -36,6 +36,7 @@ import {
 import { handleGetLineage } from './routes/lineage';
 import { handlePublicPlant } from './routes/public';
 import { handleGerminationByCrossing, handleGerminationByParent } from './routes/analytics';
+import { handleListTasks, handleUpdateTask } from './routes/tasks';
 import {
   handleCreateComment,
   handleCreateLike,
@@ -85,6 +86,8 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //     - POST /api/ai/consult、POST /api/ai/listing
 //   Phase 4（課金。Stripe 月額サブスク ¥300/月）
 //     - POST /api/billing/checkout、POST /api/billing/portal
+//   次の作業（routes/tasks.ts。記録の状態から導く）
+//     - GET  /api/tasks、PATCH /api/tasks/:kind/:id（予定日・種の使用期限・一覧から外す）
 //   発芽率の集計（routes/analytics.ts）
 //     - GET  /api/analytics/germination          … 交配ごと + 全体（無料）
 //     - GET  /api/analytics/germination/parents  … 親個体ごとの比較（有料ゲート）
@@ -248,6 +251,17 @@ async function route(
   }
 
   // --- Phase 3: AI -----------------------------------------------------------
+
+  if (pathname === '/api/tasks') {
+    if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleListTasks(sql, user);
+  }
+
+  const taskById = pathname.match(/^\/api\/tasks\/([^/]+)\/([^/]+)$/);
+  if (taskById) {
+    if (req.method !== 'PATCH') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleUpdateTask(req, sql, user, decodeURIComponent(taskById[1]), decodeURIComponent(taskById[2]));
+  }
 
   if (pathname === '/api/analytics/germination') {
     if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');

@@ -87,6 +87,11 @@ export const api = {
   updateSowing: (sowingId, patch) =>
     call(`/api/sowings/${sowingId}`, { method: 'PATCH', body: patch }),
 
+  // 次の作業（記録の状態から Worker が導く）。kind は harvest / sow / germination
+  tasks: () => call('/api/tasks'),
+  updateTask: (kind, recordId, patch) =>
+    call(`/api/tasks/${enc(kind)}/${enc(recordId)}`, { method: 'PATCH', body: patch }),
+
   // 発芽率の集計（交配ごとは無料・親ごとは有料プラン）
   germination: () => call('/api/analytics/germination'),
   germinationParents: () => call('/api/analytics/germination/parents'),

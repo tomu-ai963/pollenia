@@ -566,3 +566,20 @@ button.like.active { background: var(--rose-ink); color: #fff; }
 .germ-bar { height: 6px; margin: 0.3rem 0 0.2rem; border-radius: 999px; background: var(--line-soft); overflow: hidden; }
 .germ-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--mint-ink); }
 .germ-row .meta { font-size: 0.74rem; color: var(--muted); }
+
+/* 次の作業（記録タブの一番上） */
+.task-item {
+  padding: 0.6rem 0.2rem;
+  border-bottom: 1px solid var(--line-soft);
+  border-left: 3px solid transparent;
+  padding-left: 0.6rem;
+}
+.task-item:last-child { border-bottom: none; }
+.task-item.overdue { border-left-color: #d9534f; }
+.task-item.soon { border-left-color: var(--mint-ink); }
+.task-item strong { font-weight: 500; }
+.task-item .meta { font-size: 0.76rem; color: var(--muted); margin: 0.15rem 0 0.35rem; }
+.task-item.overdue .meta { color: #b94a48; }
+.task-controls { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; align-items: center; }
+.task-date { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; color: var(--muted); }
+.task-date input { width: auto; margin: 0; padding: 0.2rem 0.3rem; font-size: 0.8rem; }

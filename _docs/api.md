@@ -147,6 +147,21 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
   429 になった試行もイベントとして残る。
 - 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）。
 
+## 次の作業（routes/tasks.ts。すべてセッション + profiles 行を要求）
+
+| Method | Path | 内容 |
+|---|---|---|
+| GET | /api/tasks | まだの作業の一覧 |
+| PATCH | /api/tasks/:kind/:id | `{ due_date?, sow_by_date?, dismissed? }` 予定日・種の使用期限（sow のみ）・一覧から外す / 戻す |
+
+- 作業は別テーブルに持たず、記録の状態から導く（0004_next_tasks.sql）:
+  `harvest`（交配して採種がまだ。id = crossings.id）/ `sow`（採種して播種がまだ。id = seed_harvests.id）/
+  `germination`（播種して発芽数が未記録。id = sowings.id）。次の記録を付ければ作業は消える。
+- 期日 = 予定日と種の使用期限のうち早いほう。期日のあるものを早い順に先へ、期日なしは起点の日
+  （交配日・採種日・播種日）が古い順に後ろへ。期日を過ぎたかは利用者の暦で決まるので画面側で判定する。
+- 表は kind から固定の文字列で選び、すべてのクエリを検証済み uid で絞る（他人の記録・kind と合わない id は 404）。
+- 通知（メール・cron）はまだ無い。画面は記録タブの一番上と、タブの「記録（期日を過ぎた件数）」。
+
 ## 発芽率の集計（routes/analytics.ts。すべてセッション + profiles 行を要求）
 
 | Method | Path | 内容 |
