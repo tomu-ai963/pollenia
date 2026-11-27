@@ -6,3 +6,10 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# llms.txt・robots.txt（geo/sync.mjs が生成）に charset を付ける。本番の静的アセットは .txt を
+# charset なしの text/plain で返し、日本語の llms.txt がブラウザで化けうる（wrangler dev は付けるのでローカルでは気づけない）。
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+/robots.txt
+  Content-Type: text/plain; charset=utf-8
