@@ -1,3 +1,5 @@
 *.sh text eol=lf
 *.sql text eol=lf
 frontend/vendor/** -text
+# geo-kit のコピー（#! で始まる .mjs）。CRLF だと vitest が読み込めないので LF に固定する
+geo/*.mjs text eol=lf
