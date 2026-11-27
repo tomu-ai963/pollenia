@@ -6,7 +6,8 @@ import { initCommunity, openMyProfile, loadCrossingOptions } from './community.j
 import { initAi, resetListingUi } from './ai.js';
 import { initGermination, loadGermination } from './germination.js';
 import { initTasks, loadTasks } from './tasks.js';
-import { recordHarvest, recordSowing, recordGermination } from './record-actions.js';
+import { recordHarvest, recordSowing, recordGermination, localToday } from './record-actions.js';
+import { renderLineageCard, cardFileName } from './lineage-card.js';
 import { reencodePhoto } from './photo-image.js';
 import { planLabel } from './plan-label.js';
 import { parsePlantParam, PLANT_PARAM } from './plant-link.js';
@@ -18,6 +19,11 @@ let me = null; // 自分の profile（subscription_status を含む）
 
 // QR ラベルの直リンク（/?plant=<id>）。ログイン手続きの間も失わないよう、読み込み時に取っておく。
 let pendingPlantId = parsePlantParam(location.search);
+
+// 詳細を開いている個体（系統カードを作るときに使う）
+let detailPlant = null;
+let detailPhotos = [];
+let cardUrl = null; // プレビュー・保存用の blob URL（作り直すたびに前のものを解放する）
 
 // AI 機能を利用できるサブスク状態（Worker の SUBSCRIPTION_ENTITLED_STATUSES と揃える）。
 const ENTITLED = new Set(['active', 'past_due']);
@@ -530,6 +536,9 @@ async function openDetail(plantId) {
     const { plant, photos } = await api.getPlant(plantId);
     $('detail-title').textContent = `${plant.name}${plant.species ? `（${plant.species}）` : ''}`;
     $('detail-card').dataset.plantId = plant.id;
+    detailPlant = plant;
+    detailPhotos = photos;
+    resetLineageCard();
     $('detail-label-link').href = `/labels?id=${encodeURIComponent(plant.id)}`;
     show('quick-record-success', false);
     resetListingUi(); // 前に開いた個体の出品文を残さない
@@ -568,6 +577,42 @@ async function loadLineage(plantId, direction) {
 
 $('btn-lineage-up').onclick = () => loadLineage($('detail-card').dataset.plantId, 'up');
 $('btn-lineage-down').onclick = () => loadLineage($('detail-card').dataset.plantId, 'down');
+
+// ---- 系統カード画像 -------------------------------------------------------
+
+function resetLineageCard() {
+  show('lineage-card-result', false);
+  setError('lineage-card-error', null);
+  if (cardUrl) URL.revokeObjectURL(cardUrl);
+  cardUrl = null;
+}
+
+$('btn-lineage-card').onclick = async () => {
+  const plant = detailPlant;
+  if (!plant || $('detail-card').dataset.plantId !== plant.id) return;
+  resetLineageCard();
+  $('btn-lineage-card').disabled = true;
+  try {
+    // 系統図は両親・祖父母まで（depth=2）。写真は最後に追加したもの（API は新しい順に返す）
+    const lineage = await api.lineage(plant.id, 'up', 2);
+    const photo = detailPhotos.find((p) => p.url);
+    const blob = await renderLineageCard({
+      plant,
+      photoUrl: photo?.url ?? null,
+      lineage,
+      today: localToday(),
+    });
+    cardUrl = URL.createObjectURL(blob);
+    $('lineage-card-preview').src = cardUrl;
+    $('lineage-card-download').href = cardUrl;
+    $('lineage-card-download').download = cardFileName(plant.name);
+    show('lineage-card-result', true);
+  } catch (e) {
+    setError('lineage-card-error', e);
+  } finally {
+    $('btn-lineage-card').disabled = false;
+  }
+};
 
 // 写真 1 枚を個体に保存する（行の作成 → 本体の PUT）。
 async function savePhoto(plantId, file, caption) {

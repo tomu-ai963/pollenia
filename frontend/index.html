@@ -389,6 +389,19 @@
         <button class="small ghost" id="btn-lineage-down">⬇ 子孫（この個体から）</button>
         <div id="lineage-tree" style="margin-top:0.6rem"></div>
 
+        <!-- 系統カード画像（出品写真用）。端末内で描いて PNG を保存する。URL・QR は入れない -->
+        <h2 style="margin-top:1rem">系統カード画像</h2>
+        <p class="notice">
+          名前・写真・特性と、両親・祖父母の系統図を 1 枚の正方形の画像にします。フリマの商品写真にそのまま使えます。
+          出品先によっては外部サイトへの誘導が禁止されているため、URL や QR コードは入れていません。
+        </p>
+        <button id="btn-lineage-card">カードを作る</button>
+        <div id="lineage-card-result" class="hidden">
+          <img id="lineage-card-preview" class="lineage-card-preview" alt="系統カードのプレビュー">
+          <a class="button-link" id="lineage-card-download" download>画像を保存</a>
+        </div>
+        <div class="error" id="lineage-card-error"></div>
+
         <!-- 出品文自動生成（Phase 3）。生成結果は編集・コピー可能。自動投稿はしない。 -->
         <h2 style="margin-top:1rem">出品文を生成（AI）</h2>
         <p class="notice">この個体の特性・系統情報から出品文の下書きを作ります。内容を確認・編集してからご利用ください。</p>
