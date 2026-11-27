@@ -30,6 +30,10 @@ export interface Env {
   // ローカル専用。"1" でログインコードを Worker のログに出す。リクエストのホストが
   // localhost / 127.0.0.1 のときしか効かない（本番に紛れ込んでもコードはログに出ない）。
   MOCK_MAIL?: string;
+  // 利用者ごとの回数制限（wrangler.toml の [[ratelimits]]。src/lib/rate-limit.ts）。無ければ該当の操作は 503
+  IMPORT_LIMITER?: RateLimit;
+  EXCHANGE_LIMITER?: RateLimit;
+  PHOTO_LIMITER?: RateLimit;
   // 週1メール（scheduled.ts）のリンクの起点。cron にはリクエストが無いので設定で持つ（wrangler.toml の [vars]）
   APP_ORIGIN?: string;
   // PIN の PBKDF2 反復回数（1,000〜100,000。既定 100,000）。テスト・ローカルで下げる用。
