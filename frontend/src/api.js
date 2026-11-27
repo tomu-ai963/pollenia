@@ -87,6 +87,10 @@ export const api = {
   updateSowing: (sowingId, patch) =>
     call(`/api/sowings/${sowingId}`, { method: 'PATCH', body: patch }),
 
+  // 過去の記録の取り込み（CSV を端末で読んだ行）。dryRun は内容の確認だけ
+  importPlants: (rows, dryRun) =>
+    call(`/api/import/plants${dryRun ? '?dry_run=1' : ''}`, { method: 'POST', body: { rows } }),
+
   // 次の作業（記録の状態から Worker が導く）。kind は harvest / sow / germination
   tasks: () => call('/api/tasks'),
   updateTask: (kind, recordId, patch) =>

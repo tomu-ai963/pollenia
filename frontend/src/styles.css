@@ -627,3 +627,7 @@ a.button-link {
 .gallery-item-body .meta { font-size: 0.74rem; color: var(--muted); }
 #btn-gallery-more { display: block; margin: 16px auto; }
 #gallery-empty { text-align: center; }
+
+/* 過去の記録の取り込み（記録タブ） */
+#import-file { margin: 0.4rem 0; }
+.import-errors { margin: 0.4rem 0 0; padding-left: 1.2rem; color: #b94a48; font-size: 0.82rem; }

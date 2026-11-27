@@ -159,6 +159,23 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
 - 新しい写真の順に `GALLERY_PAGE_SIZE` 件ずつ。offset は `GALLERY_MAX_OFFSET` でクランプし、
   次のページがあれば `next_offset`。`Cache-Control: public, max-age=60`（公開系統ページと同じ）。
 
+## 過去の記録の取り込み（routes/import.ts。セッション + profiles 行を要求）
+
+| Method | Path | 内容 |
+|---|---|---|
+| POST | /api/import/plants?dry_run=1 | `{ rows: [...] }`（最大 500 行）。dry_run は書き込まずに作るものを返す |
+
+- CSV の読み取り（UTF-8 / Shift_JIS、見出しの揺れ）は画面（`frontend/src/csv-import.js`）で行い、
+  行を JSON で送る。検証と作成は Worker（`lib/import-plan.ts` が計画、ルートが 1 トランザクションで作成）。
+- 1 行 = 1 個体。項目: `name`（必須）, `species`, `mother`, `father`, `cross_date`, `notes`, 特性 5 項目。
+  ひな形は `frontend/assets/pollenia-import-template.csv`。
+- 親の名前は CSV の行 → 自分の登録済みの未削除の個体（1 件に決まるとき）→ どちらにも無ければ導入株を自動で作る。
+  父の欄は空・「不明」で父不明、「自家」か母と同じ名前で自家受粉。同じ母・父・交配日の行は 1 つの交配にまとめる。
+- 交配 → 採種 → 播種 → 子（`origin_sowing_id`）を作って系統をつなぐ。系統のために作る採種・播種は
+  `task_dismissed_at` を立て、「次の作業」にも発芽率の「未記録」にも出さない。
+- 作る個体はすべて private・ギャラリーに載せない。登録済みと同じ名前の行・CSV 内の重複・親子の輪はエラー（422 で行ごと）。
+  エラー文言に入力値は入れない。
+
 ## 次の作業（routes/tasks.ts。すべてセッション + profiles 行を要求）
 
 | Method | Path | 内容 |

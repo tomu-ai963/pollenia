@@ -37,6 +37,7 @@ import { handleGetLineage } from './routes/lineage';
 import { handlePublicGallery, handlePublicPlant } from './routes/public';
 import { handleGerminationByCrossing, handleGerminationByParent } from './routes/analytics';
 import { handleListTasks, handleUpdateTask } from './routes/tasks';
+import { handleImportPlants } from './routes/import';
 import {
   handleCreateComment,
   handleCreateLike,
@@ -87,6 +88,8 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //     - POST /api/ai/consult、POST /api/ai/listing
 //   Phase 4（課金。Stripe 月額サブスク ¥300/月）
 //     - POST /api/billing/checkout、POST /api/billing/portal
+//   過去の記録の取り込み（routes/import.ts）
+//     - POST /api/import/plants?dry_run=1   … CSV を画面で読んだ行（最大 500）。dry_run はプレビュー
 //   次の作業（routes/tasks.ts。記録の状態から導く）
 //     - GET  /api/tasks、PATCH /api/tasks/:kind/:id（予定日・種の使用期限・一覧から外す）
 //   発芽率の集計（routes/analytics.ts）
@@ -254,6 +257,11 @@ async function route(
   }
 
   // --- Phase 3: AI -----------------------------------------------------------
+
+  if (pathname === '/api/import/plants') {
+    if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    return handleImportPlants(req, sql, user);
+  }
 
   if (pathname === '/api/tasks') {
     if (req.method !== 'GET') return errorResponse('METHOD_NOT_ALLOWED');

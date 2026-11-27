@@ -514,6 +514,24 @@
         <span class="notice success hidden" id="crossing-edit-success">保存しました。</span>
         <div class="error" id="crossing-edit-error"></div>
       </section>
+      <!-- 過去の記録の取り込み（CSV）。内容を確認（dry run）してから取り込む -->
+      <section class="card" id="import-card">
+        <h2>過去の記録を取り込む（CSV）</h2>
+        <p class="notice">
+          Excel や紙のノートの記録を、1 行 1 個体の CSV にして取り込めます。母・父の欄に名前を書くと、系統としてつながります。
+          親がまだ登録されていなければ、その名前で導入株を作ります。取り込んだ個体はすべて非公開（private）です。
+        </p>
+        <p class="notice">
+          <a href="/assets/pollenia-import-template.csv" download>ひな形の CSV をダウンロード</a>
+          （父の欄は「不明」で父不明、「自家」で自家受粉。Excel で保存した CSV もそのまま読めます）
+        </p>
+        <input type="file" id="import-file" accept=".csv,text/csv">
+        <button class="ghost" id="btn-import-check">内容を確認</button>
+        <button id="btn-import-run" disabled>取り込む</button>
+        <div class="notice" id="import-summary"></div>
+        <ul class="import-errors" id="import-errors"></ul>
+        <div class="error" id="import-error"></div>
+      </section>
       </div><!-- /tab-records -->
     </div>
   </main>

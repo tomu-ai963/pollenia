@@ -8,6 +8,7 @@ import { initGermination, loadGermination } from './germination.js';
 import { initTasks, loadTasks } from './tasks.js';
 import { recordHarvest, recordSowing, recordGermination, localToday } from './record-actions.js';
 import { renderLineageCard, cardFileName } from './lineage-card.js';
+import { decodeCsvBytes, parseCsv, tableToRows } from './csv-import.js';
 import { reencodePhoto } from './photo-image.js';
 import { planLabel } from './plan-label.js';
 import { parsePlantParam, PLANT_PARAM } from './plant-link.js';
@@ -841,6 +842,75 @@ $('btn-save-crossing').onclick = async () => {
     await Promise.all([loadCrossings(), loadCrossingOptions()]);
   } catch (e) {
     setError('crossing-edit-error', e);
+  }
+};
+
+// ---- 過去の記録の取り込み（CSV） -------------------------------------------
+
+let importRows = null; // 「内容を確認」が通った行（取り込むボタンはこれを送る）
+
+function resetImport() {
+  importRows = null;
+  $('btn-import-run').disabled = true;
+  $('import-summary').textContent = '';
+  $('import-errors').replaceChildren();
+  setError('import-error', null);
+}
+
+function showImportErrors(e) {
+  const errors = e instanceof ApiError ? e.body?.errors : null;
+  if (!Array.isArray(errors)) return setError('import-error', e);
+  setError('import-error', new Error('取り込めない行があります。CSV を直してから、もう一度確認してください。'));
+  $('import-errors').replaceChildren(
+    ...errors.slice(0, 50).map((x) => {
+      const li = document.createElement('li');
+      // API の row はデータの何行目か（1 始まり）。CSV では見出しが 1 行目なので +1 する
+      li.textContent = x.row ? `CSV の ${x.row + 1} 行目: ${x.message}` : x.message;
+      return li;
+    }),
+  );
+}
+
+function importSummaryText(summary, done) {
+  const parents = summary.auto_parents.length
+    ? `・親として導入株 ${summary.auto_parents.length} 件（${summary.auto_parents.slice(0, 5).join('、')}${summary.auto_parents.length > 5 ? ' ほか' : ''}）`
+    : '';
+  return `${done ? '取り込みました' : '取り込む内容'}: 個体 ${summary.plants} 件${parents}・交配 ${summary.crossings} 件`;
+}
+
+$('import-file').onchange = resetImport;
+
+$('btn-import-check').onclick = async () => {
+  resetImport();
+  const file = $('import-file').files[0];
+  if (!file) return setError('import-error', new Error('CSV ファイルを選んでください。'));
+  try {
+    const { rows, unknownHeaders, hasName } = tableToRows(parseCsv(decodeCsvBytes(await file.arrayBuffer())));
+    if (!hasName) throw new Error('「名前」の列が見つかりません。ひな形の見出しを使ってください。');
+    const { summary } = await api.importPlants(rows, true);
+    importRows = rows;
+    $('import-summary').textContent =
+      importSummaryText(summary, false) +
+      (unknownHeaders.length ? `（使わない列: ${unknownHeaders.join('、')}）` : '');
+    $('btn-import-run').disabled = false;
+  } catch (e) {
+    showImportErrors(e);
+  }
+};
+
+$('btn-import-run').onclick = async () => {
+  if (!importRows) return;
+  $('btn-import-run').disabled = true;
+  setError('import-error', null);
+  try {
+    const { summary } = await api.importPlants(importRows, false);
+    importRows = null;
+    $('import-summary').textContent = importSummaryText(summary, true);
+    $('import-file').value = '';
+    await Promise.all([loadPlants(), loadCrossings(), loadCrossingOptions()]);
+  } catch (e) {
+    showImportErrors(e);
+    $('btn-import-run').disabled = !importRows;
   }
 };
 

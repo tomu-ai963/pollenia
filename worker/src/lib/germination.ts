@@ -3,7 +3,7 @@
 // 数え方:
 // - 発芽率の分母・分子に入れるのは「播種数 > 0 かつ 発芽数が記録済み」の播種だけ。
 //   発芽数が未記録の播種は、まだ結果が出ていないもの（pending_sowings）として別に数える
-//   （0 発芽として数えると、まいたばかりの交配の発芽率が不当に低く出る）
+//   （0 発芽として数えると、まいたばかりの交配の発芽率が不当に低く出る）。播種数も無い播種は数えない
 // - 発芽数が播種数を超える入力は、播種数で頭打ちにする（率が 100% を超えない）
 // - 発芽までの日数は、播種日・初発芽日がどちらもあり、0 日以上のものの平均
 
@@ -39,7 +39,8 @@ export function summarizeSowings(rows: readonly SowingForStats[]): GerminationSt
     const s = r.sowing_count;
     const g = r.germination_count;
     if (g === null || g === undefined) {
-      pending++;
+      // 播種数も無い播種（CSV 取り込みで系統をつなぐために作ったもの）は、結果待ちに数えない
+      if (s !== null && s !== undefined) pending++;
     } else if (s !== null && s !== undefined && s > 0) {
       sown += s;
       germinated += Math.min(g, s);
