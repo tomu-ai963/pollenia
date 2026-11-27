@@ -14,7 +14,7 @@ paths: ["worker/src/**/*.ts"]
    `depth` は Worker がクランプ（`constants.ts`）
 5. 有効なセッション ≠ Pollenia ユーザー。必ず `pollenia.profiles` 行で判定（`lib/auth.ts` の
    `authenticateUser`）。セッション必須ルートは workers-auth の `auth.middleware()`（Origin + CSRF
-   二重送信の検査込み）を通す。認証不要にしてよいのは `/api/health`・`/public/plants/:id`・
+   二重送信の検査込み）を通す。認証不要にしてよいのは `/api/health`・`/public/plants/:id`・`/public/gallery`・
    `/photos/:token`・`/api/billing/webhook`（Stripe 署名で真正性を担保）だけ
 6. 関数の EXECUTE 権限は明示管理（PUBLIC から revoke 済み。マイグレーション参照）
 7. 可視性判定は `worker/src/lib/visibility.ts` を唯一の入口とし、
@@ -35,3 +35,7 @@ paths: ["worker/src/**/*.ts"]
 12. workers-auth: pg ストアは1リクエスト1接続・Hyperdrive は `--caching-disabled`・読み取り
    レプリカ禁止。ログやレスポンスにメールアドレス・ログインコード・PIN を出さない
    （`MOCK_MAIL` は localhost のリクエストでしか効かない）
+13. 公開ギャラリー（`/public/gallery`）に載せるのは **visibility = public かつ本人が `in_gallery` を
+   選んだ個体だけ**（URL を知る人だけが見られる public より範囲が広いので、既定は載せない）。
+   返すのは公開系統ページと同じ範囲（名前・属種・表示名）と最新写真 1 枚の署名 URL まで。
+   notes・traits・user_id は返さない。SQL で絞った後も `canView(null, …)` を通す

@@ -602,3 +602,28 @@ a.button-link {
   font-weight: 600;
   text-decoration: none;
 }
+
+/* 公開ギャラリー（gallery.html） */
+.gallery-grid {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.gallery-item {
+  display: block;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  color: var(--ink);
+  text-decoration: none;
+}
+.gallery-item img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
+.gallery-item-body { padding: 0.5rem 0.7rem 0.7rem; }
+.gallery-item-body strong { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.gallery-item-body .meta { font-size: 0.74rem; color: var(--muted); }
+#btn-gallery-more { display: block; margin: 16px auto; }
+#gallery-empty { text-align: center; }

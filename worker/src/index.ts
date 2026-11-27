@@ -34,7 +34,7 @@ import {
   handleUpdateSowing,
 } from './routes/records';
 import { handleGetLineage } from './routes/lineage';
-import { handlePublicPlant } from './routes/public';
+import { handlePublicGallery, handlePublicPlant } from './routes/public';
 import { handleGerminationByCrossing, handleGerminationByParent } from './routes/analytics';
 import { handleListTasks, handleUpdateTask } from './routes/tasks';
 import {
@@ -63,6 +63,7 @@ import { handleCreateCheckout, handleCreatePortal, handleStripeWebhook } from '.
 //   認証不要
 //     - GET  /api/health                … ヘルスチェック
 //     - GET  /public/plants/:id         … 公開系統ページの API（p_viewer=null で RPC）
+//     - GET  /public/gallery            … 公開ギャラリー（public かつ本人が載せた個体。0005_gallery.sql）
 //     - GET  /photos/:token             … 写真（Worker が署名した URL のみ。lib/photos.ts）
 //     - POST /api/billing/webhook       … Stripe Webhook（署名で真正性を担保）
 //   ログイン（workers-auth deviceAuth。lib/auth.ts）
@@ -132,6 +133,8 @@ app.use('*', async (c, next) => {
 app.get('/api/health', () => json({ service: 'pollenia-worker', ok: true }));
 
 app.get('/photos/:token', (c) => handleGetPhoto(c.env, c.req.param('token')));
+
+app.get('/public/gallery', (c) => handlePublicGallery(c.req.raw, c.var.sql, createPhotoSigner(c.env)));
 
 app.get('/public/plants/:id', (c) =>
   handlePublicPlant(c.var.sql, createPhotoSigner(c.env), c.req.param('id')),

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pollenia — みんなの育種ギャラリー</title>
+  <meta name="description" content="Pollenia で育種家が公開している花と系統のギャラリー。">
+  <link rel="icon" type="image/svg+xml" href="assets/pollenia-icon.svg">
+  <link rel="apple-touch-icon" href="assets/pollenia-icon.png">
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <header>
+    <h1>🌸 Pollenia</h1>
+    <div><a class="small" href="/">ログイン / はじめる</a></div>
+  </header>
+
+  <main>
+    <section class="card gallery-intro">
+      <h2>みんなの育種ギャラリー</h2>
+      <p class="notice">
+        Pollenia で交配・採種・播種を記録している育種家が、公開している花と系統です。
+        写真を開くと、両親や祖父母までの系統をたどれます。
+      </p>
+      <p class="notice">
+        自分の交配も記録してみませんか？ メールアドレスだけで、すぐにはじめられます。
+        <a href="/">記録をはじめる →</a>
+      </p>
+    </section>
+
+    <div id="gallery-grid" class="gallery-grid"></div>
+    <p class="notice hidden" id="gallery-empty">まだ公開されている花はありません。</p>
+    <button class="ghost hidden" id="btn-gallery-more">もっと見る</button>
+    <div class="error" id="gallery-error"></div>
+  </main>
+  <footer class="site-footer">
+    <a href="/legal/terms">利用規約</a>
+    <a href="/legal/privacy">プライバシーポリシー</a>
+    <a href="/legal/tokushoho">特定商取引法に基づく表記</a>
+    <span>運営 TOMU GARDEN</span>
+  </footer>
+
+  <script type="module" src="src/gallery.js"></script>
+</body>
+</html>

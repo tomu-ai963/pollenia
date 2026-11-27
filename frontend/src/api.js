@@ -132,4 +132,5 @@ export const api = {
 
   // 公開ページ（認証不要）
   publicPlant: (plantId) => call(`/public/plants/${plantId}`),
+  gallery: (offset = 0) => call(`/public/gallery?offset=${Number(offset) || 0}`),
 };

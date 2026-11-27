@@ -337,6 +337,12 @@ async function loadPlants() {
     badge.className = `badge ${p.visibility}`;
     badge.textContent = p.visibility;
     info.appendChild(badge);
+    if (p.in_gallery && p.visibility === 'public') {
+      const g = document.createElement('span');
+      g.className = 'badge public';
+      g.textContent = 'ギャラリー';
+      info.appendChild(g);
+    }
     const meta = document.createElement('div');
     meta.className = 'meta';
     meta.textContent = [p.species, p.origin_sowing_id ? '自家実生' : '導入株']
@@ -413,6 +419,7 @@ function openPlantEdit(p) {
   $('edit-plant-species').value = p.species ?? '';
   $('edit-plant-visibility').value = p.visibility ?? 'private';
   $('edit-plant-notes').value = p.notes ?? '';
+  $('edit-plant-in-gallery').checked = !!p.in_gallery;
   const t = p.traits ?? {};
   $('edit-plant-bloom-season').value = t.bloom_season ?? '';
   $('edit-plant-fragrance-strength').value = t.fragrance_strength ?? '';
@@ -437,6 +444,7 @@ $('btn-save-plant').onclick = async () => {
       species: $('edit-plant-species').value.trim() || null,
       visibility: $('edit-plant-visibility').value,
       notes: $('edit-plant-notes').value.trim() || null,
+      in_gallery: $('edit-plant-in-gallery').checked,
       traits: collectTraits('edit-plant-'),
     });
     show('plant-edit-success', true);

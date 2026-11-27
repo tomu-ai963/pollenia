@@ -69,6 +69,12 @@ profiles ──┬─ plants ──────────┐
   `sowings.expected_germination_date`）、種の使用期限（`seed_harvests.sow_by_date`）、
   一覧から外した印（3表の `task_dismissed_at`。結実しなかった交配など。記録そのものは消さない）。
 
+## 公開ギャラリー（0005_gallery.sql）
+
+- `plants.in_gallery`（既定 false）。ギャラリーに並べると誰でもたどれるようになり、「URL を知る人だけ」の
+  public より公開の範囲が広がるため、個体ごとに本人が選ぶ。載る条件は visibility = public と組み合わせて
+  Worker が判定する（public でなくなれば in_gallery のままでも載らない）。
+
 ## 将来の拡張候補（今はやらない）
 
 - species マスタテーブル化・タグ

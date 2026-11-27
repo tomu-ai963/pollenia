@@ -116,3 +116,7 @@ export const ANALYTICS_MAX_SOWINGS = 5000;
 
 // 「次の作業」（GET /api/tasks）で、種類（採種・播種・発芽の確認）ごとに返す上限（新しい記録から）。
 export const TASKS_MAX_PER_KIND = 200;
+
+// 公開ギャラリー（GET /public/gallery）。1 ページの件数と、たどれる offset の上限。
+export const GALLERY_PAGE_SIZE = 24;
+export const GALLERY_MAX_OFFSET = 480;

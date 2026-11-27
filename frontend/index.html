@@ -66,6 +66,9 @@
       </div>
 
       <div class="error" id="auth-error"></div>
+      <p class="notice gallery-link">
+        <a href="/gallery">ログインせずに、みんなの育種ギャラリーを見る →</a>
+      </p>
     </section>
 
     <!-- Pollenia 初回登録（ログイン済みだが profiles 行がない状態） -->
@@ -303,6 +306,10 @@
             </select>
           </div>
         </div>
+        <label class="check-inline">
+          <input type="checkbox" id="edit-plant-in-gallery">
+          <span>公開ギャラリーに載せる（公開範囲が public で、写真が 1 枚以上あるときだけ載ります。誰でもログインせずに見られます）</span>
+        </label>
         <label>メモ</label>
         <textarea id="edit-plant-notes"></textarea>
 

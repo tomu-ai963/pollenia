@@ -38,6 +38,7 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
 | PATCH | /api/sowings/:id | 発芽数・日付の更新 |
 | GET | /api/plants/:id/lineage?direction=up\|down&depth=N | 系統樹（下記「系統樹エンドポイント」参照） |
 | GET | /public/plants/:id | 公開系統ページ用（認証不要、下記参照） |
+| GET | /public/gallery?offset=N | 公開ギャラリー（認証不要。下記「公開ギャラリー」） |
 
 ### 系統樹エンドポイント（重要：viewer の扱い）
 
@@ -146,6 +147,17 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
   （Opus 4.8 レビュー M1: check-then-insert の TOCTOU で並行リクエストがすり抜けるのを防ぐ）。
   429 になった試行もイベントとして残る。
 - 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）。
+
+## 公開ギャラリー（routes/public.ts の handlePublicGallery。認証不要）
+
+- 画面は `/gallery`（ログイン画面と公開系統ページから入れる）。
+- 載るのは visibility = public **かつ本人が `in_gallery` を選んだ**未削除の個体で、写真が 1 枚以上あるものだけ
+  （0005_gallery.sql。URL を知る人だけが見られる public より範囲が広いので、既定は載せない）。
+  `in_gallery` は `POST/PATCH /api/plants` で設定し、所有者向けの応答にだけ含まれる。
+- 返す項目: `id, name, species, is_seedling, owner_name, photo_url`（最新写真 1 枚の署名 URL）。
+  公開系統ページと同じ範囲で、notes・traits・user_id は返さない。SQL で絞った後も `canView(null, …)` を通す。
+- 新しい写真の順に `GALLERY_PAGE_SIZE` 件ずつ。offset は `GALLERY_MAX_OFFSET` でクランプし、
+  次のページがあれば `next_offset`。`Cache-Control: public, max-age=60`（公開系統ページと同じ）。
 
 ## 次の作業（routes/tasks.ts。すべてセッション + profiles 行を要求）
 

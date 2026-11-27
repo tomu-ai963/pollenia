@@ -21,7 +21,7 @@ import {
 // 閲覧は所有者 + canViewWithDb（visibility 列に基づく共通判定。lib/visibility.ts）。
 
 const PLANT_COLS = `id, user_id, name, species, visibility, notes, traits,
-  origin_sowing_id, deleted_at, created_at, updated_at`;
+  origin_sowing_id, in_gallery, deleted_at, created_at, updated_at`;
 
 // GET /api/plants — 自分の個体一覧（soft delete 済みは除く）。?limit&offset
 export async function handleListPlants(
@@ -63,7 +63,7 @@ export async function handleCreatePlant(
 
   const parsed = parseOptionalPlantFields(body);
   if (!parsed.ok) return parsed.response;
-  const { species, visibility, notes, traits, originSowingId } = parsed.value;
+  const { species, visibility, notes, traits, originSowingId, inGallery } = parsed.value;
 
   if (originSowingId) {
     const own = await sql`
@@ -78,10 +78,10 @@ export async function handleCreatePlant(
   }
 
   const rows = await sql`
-    insert into pollenia.plants (user_id, name, species, visibility, notes, traits, origin_sowing_id)
+    insert into pollenia.plants (user_id, name, species, visibility, notes, traits, origin_sowing_id, in_gallery)
     values (${user.uid}::uuid, ${name}, ${species}, ${visibility ?? 'private'},
             ${notes}, ${sql.json((traits ?? {}) as Record<string, string | number>)},
-            ${originSowingId ? sql`${originSowingId}::uuid` : null})
+            ${originSowingId ? sql`${originSowingId}::uuid` : null}, ${inGallery ?? false})
     returning ${sql.unsafe(PLANT_COLS)}
   `;
   return json({ plant: rows[0] }, 201);
@@ -135,7 +135,7 @@ export async function handleGetPlant(
   });
 }
 
-// PATCH /api/plants/:id — 所有者のみ。name / species / visibility / notes / origin_sowing_id
+// PATCH /api/plants/:id — 所有者のみ。name / species / visibility / notes / origin_sowing_id / in_gallery
 export async function handleUpdatePlant(
   req: Request,
   sql: Sql,
@@ -158,6 +158,7 @@ export async function handleUpdatePlant(
   if (body.species !== undefined) patch.species = parsed.value.species;
   if (body.visibility !== undefined) patch.visibility = parsed.value.visibility;
   if (body.notes !== undefined) patch.notes = parsed.value.notes;
+  if (body.in_gallery !== undefined) patch.in_gallery = parsed.value.inGallery;
   if (body.traits !== undefined) {
     // sql.json で渡す（traits を丸ごと置換）。JSON.stringify 済み文字列を ${...}::jsonb に
     // 渡すと postgres.js が再度 JSON エンコードして jsonb が「文字列」になり、
@@ -367,6 +368,8 @@ function parseOptionalPlantFields(body: Record<string, unknown>):
         notes: string | null;
         traits: Record<string, unknown> | null;
         originSowingId: string | null;
+        /** 公開ギャラリーに載せるか（未指定は null）。載るのは visibility = public のときだけ */
+        inGallery: boolean | null;
       };
     }
   | { ok: false; response: Response } {
@@ -424,5 +427,16 @@ function parseOptionalPlantFields(body: Record<string, unknown>):
     originSowingId = body.origin_sowing_id;
   }
 
-  return { ok: true, value: { species, visibility, notes, traits, originSowingId } };
+  let inGallery: boolean | null = null;
+  if (body.in_gallery !== undefined) {
+    if (typeof body.in_gallery !== 'boolean') {
+      return {
+        ok: false,
+        response: errorResponse('VALIDATION_ERROR', { publicMessage: 'in_gallery は true / false。' }),
+      };
+    }
+    inGallery = body.in_gallery;
+  }
+
+  return { ok: true, value: { species, visibility, notes, traits, originSowingId, inGallery } };
 }
