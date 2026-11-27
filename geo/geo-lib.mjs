@@ -321,7 +321,8 @@ export function injectBodyHtml(html, body) {
 export function buildHeaders(c, extraPaths = []) {
   const paths = ["/llms.txt", ...extraPaths, "/robots.txt"];
   const rules = [...new Set(paths)].map((p) => `${p}\n  Content-Type: text/plain; charset=utf-8`).join("\n");
-  return `# GEO: ${MARKER}（テキストに charset=utf-8 を付ける。本番の静的アセットは付けないため）
+  // コメントは ASCII だけにする（_headers は設定ファイルなので、文字コードの扱いに頼らない）
+  return `# GEO: ${MARKER} (charset=utf-8 for text files; static assets omit it in production)
 ${rules}
 # /GEO`;
 }
