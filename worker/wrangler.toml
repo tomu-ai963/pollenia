@@ -27,6 +27,31 @@ APP_ORIGIN = "https://pollenia.tomu-ai.dev"
 [triggers]
 crons = ["0 23 * * 0", "0 0-11 * * 1"]
 
+# --- 利用者ごとの回数制限（src/lib/rate-limit.ts。Workers の Rate Limiting バインディング）---
+# 書き込みの多い操作を、検証済み uid ごとに数える（期間は 10 か 60 秒。拠点ごとの近似）。
+# namespace_id はアカウント内で一意の整数（ほかの Worker と数を共有しないよう、pollenia 専用の番号）。
+# ログインなしのルート（/public/gallery・/public/unsubscribe）は、ダッシュボードの Rate Limiting（IP ごと）で守る。
+[[ratelimits]]
+name = "IMPORT_LIMITER"      # POST /api/import/plants（内容の確認を含む）: 1 分に 10 回まで
+namespace_id = "40701"
+  [ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[ratelimits]]
+name = "EXCHANGE_LIMITER"    # POST /api/exchange（譲ります・探しています）: 1 分に 5 回まで
+namespace_id = "40702"
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+[[ratelimits]]
+name = "PHOTO_LIMITER"       # POST /api/plants/:id/photos（写真の追加。まとめ取り込みは 1 回 30 枚）: 1 分に 40 枚まで
+namespace_id = "40703"
+  [ratelimits.simple]
+  limit = 40
+  period = 60
+
 # --- 画面（frontend/ をそのまま静的配信。ビルドなし）---
 # 静的ファイルに一致したパスは Worker を通らずに返る。一致しないパス（/api/*・/auth/*・
 # /public/plants/*・/photos/*）が Worker に来る。画面と API が同じオリジンになるので、

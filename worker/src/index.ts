@@ -47,6 +47,7 @@ import {
 } from './routes/seed-stocks';
 import { handleCreateExchange, handleListExchange, handleUpdateExchange } from './routes/exchange';
 import { handleScheduled } from './scheduled';
+import { limitPerUser } from './lib/rate-limit';
 import {
   handleCreateComment,
   handleCreateLike,
@@ -228,6 +229,8 @@ async function route(
   const plantPhotos = pathname.match(/^\/api\/plants\/([^/]+)\/photos$/);
   if (plantPhotos) {
     if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    const limited = await limitPerUser(env.PHOTO_LIMITER, user.uid);
+    if (limited) return limited;
     return handleCreatePhoto(req, sql, user, decodeURIComponent(plantPhotos[1]));
   }
 
@@ -296,7 +299,11 @@ async function route(
 
   if (pathname === '/api/exchange') {
     if (req.method === 'GET') return handleListExchange(req, sql, user);
-    if (req.method === 'POST') return handleCreateExchange(req, sql, user);
+    if (req.method === 'POST') {
+      const limited = await limitPerUser(env.EXCHANGE_LIMITER, user.uid);
+      if (limited) return limited;
+      return handleCreateExchange(req, sql, user);
+    }
     return errorResponse('METHOD_NOT_ALLOWED');
   }
 
@@ -308,6 +315,8 @@ async function route(
 
   if (pathname === '/api/import/plants') {
     if (req.method !== 'POST') return errorResponse('METHOD_NOT_ALLOWED');
+    const limited = await limitPerUser(env.IMPORT_LIMITER, user.uid);
+    if (limited) return limited;
     return handleImportPlants(req, sql, user);
   }
 

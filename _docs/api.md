@@ -148,6 +148,18 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
   429 になった試行もイベントとして残る。
 - 課金（Stripe）・機能制限は次フェーズ。未実装分: /api/ai/diagnose（写真診断）。
 
+## 利用者ごとの回数制限（src/lib/rate-limit.ts・wrangler.toml の [[ratelimits]]）
+
+| 対象 | 上限（検証済み uid ごと） |
+|---|---|
+| POST /api/import/plants（内容の確認を含む） | 1 分に 10 回 |
+| POST /api/exchange | 1 分に 5 回 |
+| POST /api/plants/:id/photos | 1 分に 40 枚 |
+
+- Workers の Rate Limiting バインディング（拠点ごとの近似）。超えたら 429（RATE_LIMITED）。
+- バインディングが無い・数える処理が失敗したときは通さない（fail-closed で 503）。
+- ログインなしのルート（/public/gallery・/public/unsubscribe）は、ダッシュボードの Rate Limiting（IP ごと）で守る。
+
 ## 公開ギャラリー（routes/public.ts の handlePublicGallery。認証不要）
 
 - 画面は `/gallery`（ログイン画面と公開系統ページから入れる）。
