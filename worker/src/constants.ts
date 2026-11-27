@@ -120,3 +120,8 @@ export const TASKS_MAX_PER_KIND = 200;
 // 公開ギャラリー（GET /public/gallery）。1 ページの件数と、たどれる offset の上限。
 export const GALLERY_PAGE_SIZE = 24;
 export const GALLERY_MAX_OFFSET = 480;
+
+// 「次の作業」の週1メール（scheduled.ts）。1 回の cron で処理する人数の上限（超えた分は翌日以降の再実行で）。
+export const DIGEST_MAX_PER_RUN = 300;
+// メール内のリンクの起点（cron にはリクエストが無いので固定。wrangler.toml の APP_ORIGIN が優先）
+export const APP_ORIGIN_DEFAULT = 'https://pollenia.tomu-ai.dev';

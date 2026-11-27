@@ -130,6 +130,23 @@ async function openPendingPlant() {
   await openDetail(id);
 }
 
+// 「次の作業」の週1メールを受け取るか（PATCH /api/me）。失敗したらチェックを元に戻す
+$('task-digest').onchange = async () => {
+  const box = $('task-digest');
+  box.disabled = true;
+  setError('tasks-error', null);
+  try {
+    const { task_digest } = await api.updateMe({ task_digest: box.checked });
+    box.checked = task_digest;
+    if (me) me.task_digest = task_digest;
+  } catch (e) {
+    box.checked = !box.checked;
+    setError('tasks-error', e);
+  } finally {
+    box.disabled = false;
+  }
+};
+
 // ---- 認証・登録 -----------------------------------------------------------
 // workers-auth deviceAuth（lib/auth.ts）。セッション・端末の Cookie は HttpOnly なので、
 // 「この端末は信頼済みか」は localStorage の目印で推測するだけ（外れていても PIN ログインが
@@ -212,6 +229,7 @@ async function refreshSession() {
     initGermination({ isSubscribed, switchTab });
     initTasks({ onRecorded: () => loadCrossings() });
     renderPlan();
+    $('task-digest').checked = !!profile.task_digest;
     handleCheckoutReturn();
     await Promise.all([loadPlants(), loadCrossings()]);
     await openPendingPlant();

@@ -189,7 +189,21 @@ Worker → DB は postgres.js の TCP 接続（本番は Hyperdrive → Neon）�
 - 期日 = 予定日と種の使用期限のうち早いほう。期日のあるものを早い順に先へ、期日なしは起点の日
   （交配日・採種日・播種日）が古い順に後ろへ。期日を過ぎたかは利用者の暦で決まるので画面側で判定する。
 - 表は kind から固定の文字列で選び、すべてのクエリを検証済み uid で絞る（他人の記録・kind と合わない id は 404）。
-- 通知（メール・cron）はまだ無い。画面は記録タブの一番上と、タブの「記録（期日を過ぎた件数）」。
+- 画面は記録タブの一番上と、タブの「記録（期日を過ぎた件数）」。
+
+### 週1メール（scheduled.ts・0006_task_digest.sql）
+
+| Method | Path | 内容 |
+|---|---|---|
+| PATCH | /api/me | `{ task_digest: boolean }` 受け取るか（既定 false）。GET /api/me にも含める |
+| GET / POST | /public/unsubscribe?u=&t= | 配信停止（認証不要。uid への HMAC 署名で本人を確かめる） |
+
+- cron（`[triggers] crons = ["0 23 * * 0"]` = 毎週月曜 8:00 JST）。task_digest の人のうち今日（JST）まだの人に、
+  期日が 7 日以内（過ぎたものを含む）の作業があれば送る。無ければ送らない。`task_digest_last_sent_on` で同じ日に二重に送らない。
+- 配信停止: GET は確認ページだけ（リンクの先読みで止まらない）、POST で止める。`List-Unsubscribe` /
+  `List-Unsubscribe-Post`（RFC 8058 のワンクリック）を付ける。署名の鍵は DEVICE_AUTH_SECRET から HKDF で用途別に派生。
+- ログに宛先・本文を出さない。ローカルは `npm run dev -- --test-scheduled` → `curl "http://localhost:8787/__scheduled?cron=0+23+*+*+0"`
+  （MOCK_MAIL=1 なら件名と行数だけログに出る）。
 
 ## 発芽率の集計（routes/analytics.ts。すべてセッション + profiles 行を要求）
 

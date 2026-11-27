@@ -3,7 +3,7 @@ import { json } from '../lib/http';
 import { errorResponse } from '../lib/error-response';
 import type { AuthedUser } from '../lib/auth';
 import { asDateStr, isUuid } from '../lib/validate';
-import { buildTasks, TASK_KINDS, type TaskKind, type TaskSource } from '../lib/tasks';
+import { buildTasks, TASK_KINDS, type Task, type TaskKind, type TaskSource } from '../lib/tasks';
 import { TASKS_MAX_PER_KIND } from '../constants';
 
 // 「次の作業」一覧 API（0004_next_tasks.sql）。交配・採種・播種は所有者のみのデータなので、
@@ -15,7 +15,11 @@ import { TASKS_MAX_PER_KIND } from '../constants';
 
 // GET /api/tasks
 export async function handleListTasks(sql: Sql, user: AuthedUser): Promise<Response> {
-  const uid = user.uid;
+  return json({ tasks: await loadTasksFor(sql, user.uid) });
+}
+
+// 利用者 1 人分の作業（週1メール scheduled.ts からも使う）。uid は検証済みのもの（セッションか cron の対象）
+export async function loadTasksFor(sql: Sql, uid: string): Promise<Task[]> {
   const [harvest, sow, germination] = await Promise.all([
     sql`
       select 'harvest' as kind, c.id as record_id, c.id as crossing_id,
@@ -74,7 +78,7 @@ export async function handleListTasks(sql: Sql, user: AuthedUser): Promise<Respo
       `
     : [];
   const names = new Map(plants.map((p) => [p.id as string, p.name as string]));
-  return json({ tasks: buildTasks(sources, names) });
+  return buildTasks(sources, names);
 }
 
 function isTaskKind(v: string): v is TaskKind {

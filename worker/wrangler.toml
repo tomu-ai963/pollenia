@@ -17,6 +17,13 @@ workers_dev = false
 # 秘密ではない設定値。ログインコードのメール送信元（Resend で tomu-ai.dev は verified）。
 [vars]
 MAIL_FROM = "Pollenia <noreply@tomu-ai.dev>"
+# 週1メールのリンクの起点（cron にはリクエストが無いため）
+APP_ORIGIN = "https://pollenia.tomu-ai.dev"
+
+# 「次の作業」の週1メール（src/scheduled.ts）。毎週月曜 8:00 JST = 日曜 23:00 UTC。
+# ローカルで試す: npm run dev -- --test-scheduled → curl "http://localhost:8787/__scheduled?cron=0+23+*+*+0"
+[triggers]
+crons = ["0 23 * * 0"]
 
 # --- 画面（frontend/ をそのまま静的配信。ビルドなし）---
 # 静的ファイルに一致したパスは Worker を通らずに返る。一致しないパス（/api/*・/auth/*・

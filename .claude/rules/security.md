@@ -15,7 +15,7 @@ paths: ["worker/src/**/*.ts"]
 5. 有効なセッション ≠ Pollenia ユーザー。必ず `pollenia.profiles` 行で判定（`lib/auth.ts` の
    `authenticateUser`）。セッション必須ルートは workers-auth の `auth.middleware()`（Origin + CSRF
    二重送信の検査込み）を通す。認証不要にしてよいのは `/api/health`・`/public/plants/:id`・`/public/gallery`・
-   `/photos/:token`・`/api/billing/webhook`（Stripe 署名で真正性を担保）だけ
+   `/public/unsubscribe`（HMAC 署名で本人を確かめる）・`/photos/:token`・`/api/billing/webhook`（Stripe 署名で真正性を担保）だけ
 6. 関数の EXECUTE 権限は明示管理（PUBLIC から revoke 済み。マイグレーション参照）
 7. 可視性判定は `worker/src/lib/visibility.ts` を唯一の入口とし、
    **対象データ自身の visibility 列で判定。参照元エンティティの公開状態を継承しない**（F6）
@@ -39,3 +39,7 @@ paths: ["worker/src/**/*.ts"]
    選んだ個体だけ**（URL を知る人だけが見られる public より範囲が広いので、既定は載せない）。
    返すのは公開系統ページと同じ範囲（名前・属種・表示名）と最新写真 1 枚の署名 URL まで。
    notes・traits・user_id は返さない。SQL で絞った後も `canView(null, …)` を通す
+14. 週1メール（`scheduled.ts`）: 受け取るのは本人が `task_digest` を選んだ人だけ（既定は受け取らない）。
+   配信停止リンクは uid への HMAC 署名（DEVICE_AUTH_SECRET から HKDF で用途別に派生。`lib/digest.ts`）で、
+   GET は確認ページだけ・停止は POST（リンクの先読みで止まらない）。署名が合わなければ何もしない。
+   ログに宛先・本文（個体名）を出さない（MOCK_MAIL でも件名と行数だけ）

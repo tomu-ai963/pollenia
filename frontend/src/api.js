@@ -62,6 +62,8 @@ export const api = {
   register: (displayName) =>
     call('/api/profiles', { method: 'POST', body: { display_name: displayName } }),
   me: () => call('/api/me'),
+  // 自分の設定（いまは週1メールを受け取るか）
+  updateMe: (patch) => call('/api/me', { method: 'PATCH', body: patch }),
 
   // plants
   listPlants: () => call('/api/plants'),

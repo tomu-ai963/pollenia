@@ -46,9 +46,25 @@ export async function handleCreateProfile(req: Request, sql: Sql, uid: string): 
 export async function handleGetMe(sql: Sql, user: AuthedUser): Promise<Response> {
   const rows = await sql`
     select id, display_name, bio, avatar_path, subscription_status, current_period_end, cancel_at_period_end,
-      created_at, updated_at
+      task_digest, created_at, updated_at
     from pollenia.profiles where id = ${user.uid}::uuid
   `;
   if (rows.length === 0) return errorResponse('NOT_FOUND');
   return json({ profile: rows[0] });
+}
+
+// PATCH /api/me — 自分の設定。いまは「次の作業」の週1メールを受け取るか（task_digest）だけ。
+// Request: { task_digest: boolean }
+export async function handleUpdateMe(req: Request, sql: Sql, user: AuthedUser): Promise<Response> {
+  const body = (await req.json().catch(() => null)) as { task_digest?: unknown } | null;
+  if (!body || typeof body.task_digest !== 'boolean') {
+    return errorResponse('VALIDATION_ERROR', { publicMessage: 'task_digest は true / false。' });
+  }
+  const rows = await sql`
+    update pollenia.profiles set task_digest = ${body.task_digest}
+    where id = ${user.uid}::uuid
+    returning task_digest
+  `;
+  if (rows.length === 0) return errorResponse('NOT_FOUND');
+  return json({ task_digest: rows[0].task_digest });
 }
